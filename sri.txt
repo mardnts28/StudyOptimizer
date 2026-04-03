@@ -1,0 +1,3 @@
+https://cdn.tailwindcss.com/3.4.17: sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K
+https://cdn.jsdelivr.net/npm/lucide@0.473.0/dist/umd/lucide.min.js: sha384-wB13QW3u6twSB0L9C2vdVl+93uSZEWRFrRlHqIjG9jcctrZO+9z145aCi5B8eFWo
+https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js: sha384-X9kJyAubVxnP0hcA+AMMs21U445qsnqhnUF8EBlEpP3a42Kh/JwWjlv2ZcvGfphb

@@ -1,0 +1,374 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager - StudyOptimizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="icon" type="image/png" href="{% static 'main/images/logo.png' %}">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-white via-orange-50/20 to-white min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="/dashboard/" class="flex items-center gap-2">
+                <img src="{% static 'main/images/logo.png' %}" alt="Logo" class="w-10 h-10 object-contain">
+                <span class="font-bold text-gray-900">StudyOptimizer</span>
+            </a>
+            <div class="flex items-center gap-6 text-sm font-medium text-gray-500">
+                <a href="/dashboard/" class="hover:text-gray-900 transition-colors">Dashboard</a>
+                <a href="/upload/" class="hover:text-gray-900 transition-colors">Upload</a>
+                <a href="/tasks/" class="bg-red-50 text-red-700 px-4 py-2 rounded-full">Tasks</a>
+                <a href="/collaborate/" class="hover:text-gray-900 transition-colors">Collaborate</a>
+                <a href="/progress/" class="hover:text-gray-900 transition-colors">Progress</a>
+                <a href="/profile/" class="hover:text-gray-900 transition-colors">Profile</a>
+                <div class="w-px h-6 bg-gray-200 mx-2"></div>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="flex items-center gap-2 hover:text-gray-900 transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div x-data="taskManager()" class="max-w-6xl mx-auto px-6 py-8">
+
+        <!-- Page Header -->
+        <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <h1 class="text-3xl font-bold text-gray-900">Task Manager</h1>
+                    <span class="text-3xl">✅</span>
+                </div>
+                <p class="text-gray-600">Stay on top of your deadlines and crush your goals! 🎯</p>
+            </div>
+            <button @click="isDialogOpen = true; $nextTick(() => lucide.createIcons())"
+                    class="shadow-lg hover:shadow-xl transition-all font-semibold bg-gray-900 text-white px-6 py-2 rounded-md flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                Add New Task ✨
+            </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-lg rounded-2xl p-6 text-center">
+                <div class="text-4xl mb-2">📋</div>
+                <div class="text-3xl font-bold text-gray-900" x-text="tasks.length"></div>
+                <div class="text-sm font-medium text-gray-600">Total Tasks</div>
+            </div>
+            <div class="border-2 border-red-200 bg-gradient-to-br from-red-50 to-white shadow-lg rounded-2xl p-6 text-center">
+                <div class="text-4xl mb-2">🔥</div>
+                <div class="text-3xl font-bold" style="color: #8C1007;" x-text="activeTasks().length"></div>
+                <div class="text-sm font-medium text-gray-600">Active Tasks</div>
+            </div>
+            <div class="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white shadow-lg rounded-2xl p-6 text-center">
+                <div class="text-4xl mb-2">✅</div>
+                <div class="text-3xl font-bold text-green-600" x-text="completedTasks().length"></div>
+                <div class="text-sm font-medium text-gray-600">Completed</div>
+            </div>
+            <div class="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white shadow-lg rounded-2xl p-6 text-center">
+                <div class="text-4xl mb-2">🎯</div>
+                <div class="text-3xl font-bold text-purple-600" x-text="completionRate() + '%'"></div>
+                <div class="text-sm font-medium text-gray-600">Completion</div>
+            </div>
+        </div>
+
+        <!-- Motivational Banner -->
+        <template x-if="completionRate() >= 50">
+            <div class="mb-8 p-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl text-white shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 text-9xl opacity-10">🏆</div>
+                <div class="relative flex items-center gap-4">
+                    <i data-lucide="trophy" class="w-12 h-12"></i>
+                    <div>
+                        <div class="text-xl font-bold">You're crushing it! 🎉</div>
+                        <div class="text-green-100 italic" x-text="'You\'ve completed ' + completionRate() + '% of your tasks. Keep up the amazing work!'"></div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Task List -->
+        <div class="bg-white border-2 border-gray-100 shadow-xl rounded-2xl overflow-hidden">
+            <div class="bg-gradient-to-r from-red-50 to-orange-50 border-b-2 border-gray-100 p-6 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="target" class="w-5 h-5" style="color: #8C1007;"></i>
+                    <h2 class="text-lg font-bold">All Tasks</h2>
+                </div>
+                <div class="text-sm font-semibold px-3 py-1 bg-white rounded-full border-2 border-gray-200"
+                     x-text="activeTasks().length + ' active'"></div>
+            </div>
+            <div class="p-6 space-y-3">
+                <template x-if="tasks.length === 0">
+                    <div class="text-center py-16">
+                        <div class="text-6xl mb-4">📭</div>
+                        <p class="text-gray-400 font-medium">No tasks yet. Add one to get started!</p>
+                    </div>
+                </template>
+                <template x-for="task in tasks" :key="task.id">
+                    <div class="p-5 border-2 rounded-xl flex items-center gap-4 transition-all hover:shadow-md"
+                         :class="task.completed ? 'border-gray-200 bg-gray-50/50 opacity-70' : 'border-gray-100 bg-white hover:border-red-200'">
+                        <button @click="toggleTask(task.id)" class="flex-shrink-0 transition-transform hover:scale-110">
+                            <i :data-lucide="task.completed ? 'check-circle-2' : 'circle'"
+                               class="w-6 h-6"
+                               :style="task.completed ? 'color: #10B981' : 'color: #D1D5DB'"></i>
+                        </button>
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-900 mb-2"
+                                 :class="task.completed ? 'line-through text-gray-400' : ''"
+                                 x-text="task.title"></div>
+                            <div class="flex items-center gap-2 flex-wrap text-xs">
+                                <span class="px-3 py-1 rounded-full font-semibold border-2"
+                                      :style="getPriorityStyle(task.priority)"
+                                      x-text="task.priority"></span>
+                                <span class="text-gray-500 font-medium" x-text="'📅 ' + task.dueDate"></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="openEditModal(task)"
+                                    class="flex-shrink-0 p-2 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button @click="deleteTask(task.id)"
+                                    class="flex-shrink-0 p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- ── Add / Edit Task Dialog ── -->
+        <div x-show="isDialogOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+             style="display: none;">
+            <div @click.away="isDialogOpen = false; resetForm()"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border-2 border-gray-100">
+                <!-- Accent bar -->
+                <div class="p-6 border-b border-gray-100">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <span x-text="isEditMode ? 'Edit Task' : 'Create New Task'"></span>
+                        <span class="text-2xl" x-text="isEditMode ? '🔧' : '📝'"></span>
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1"
+                       x-text="isEditMode ? 'Modify your existing task details' : 'Add a new task to your study schedule'"></p>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-700">Task Title</label>
+                        <input x-model="newTask.title" type="text" placeholder="What needs to be done?"
+                               class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-gray-900 outline-none transition-colors text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-700">Priority Level</label>
+                        <select x-model="newTask.priority"
+                                class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-gray-900 outline-none transition-colors text-sm">
+                            <option value="">How urgent is it?</option>
+                            <option value="High">🔴 High Priority</option>
+                            <option value="Medium">🟡 Medium Priority</option>
+                            <option value="Low">🔵 Low Priority</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-700">Due Date</label>
+                        <input x-model="newTask.dueDate" type="date"
+                               class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-gray-900 outline-none transition-colors text-sm">
+                    </div>
+                    <button @click="addTask"
+                            :disabled="isAdding || !newTask.title || !newTask.priority || !newTask.dueDate"
+                            :class="(isAdding || !newTask.title || !newTask.priority || !newTask.dueDate)
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-gray-900 text-white hover:bg-gray-800 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] shadow-lg'"
+                            class="w-full py-4 font-semibold rounded-xl transition-all flex items-center justify-center gap-2 mt-2">
+                        <template x-if="!isAdding">
+                            <span x-text="isEditMode ? 'Save Changes ✏️' : 'Add Task 🚀'"></span>
+                        </template>
+                        <template x-if="isAdding">
+                            <span class="flex items-center gap-2">
+                                <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                Saving...
+                            </span>
+                        </template>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Custom Delete Confirmation Modal ── -->
+        <div x-show="isDeleteOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+             style="display: none;">
+            <div x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-90"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-90"
+                 class="bg-white rounded-2xl max-w-sm w-full shadow-2xl border border-gray-100 overflow-hidden">
+                <div class="p-8">
+                    <!-- Icon -->
+                    <div class="mx-auto w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-5">
+                        <i data-lucide="trash-2" class="w-8 h-8 text-red-500"></i>
+                    </div>
+                    <!-- Copy -->
+                    <div class="text-center mb-7">
+                        <h3 class="text-lg font-bold text-gray-900 mb-1.5">Delete Task?</h3>
+                        <p class="text-sm text-gray-500 leading-relaxed">
+                            This action <span class="font-semibold text-gray-700">cannot be undone</span>.
+                            The task will be permanently removed from your list.
+                        </p>
+                    </div>
+                    <!-- Buttons -->
+                    <div class="flex gap-3">
+                        <button @click="isDeleteOpen = false; taskToDelete = null"
+                                class="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:border-gray-300 hover:bg-gray-50 transition-all">
+                            Cancel
+                        </button>
+                        <button @click="confirmDelete()"
+                                class="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-semibold text-sm hover:shadow-lg hover:shadow-red-200 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                            Yes, Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        function taskManager() {
+            return {
+                isDialogOpen: false,
+                isDeleteOpen: false,
+                isAdding: false,
+                isEditMode: false,
+                currentTaskId: null,
+                taskToDelete: null,
+                newTask: { title: '', category: 'General', priority: '', dueDate: '' },
+                tasks: JSON.parse('{{ tasks_data|safe }}'),
+
+                activeTasks()    { return this.tasks.filter(t => !t.completed); },
+                completedTasks() { return this.tasks.filter(t => t.completed); },
+                completionRate() {
+                    if (this.tasks.length === 0) return 0;
+                    return Math.round((this.completedTasks().length / this.tasks.length) * 100);
+                },
+
+                async toggleTask(id) {
+                    try {
+                        const res  = await fetch(`/tasks/toggle/${id}/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            this.tasks = this.tasks.map(t => t.id === id ? { ...t, completed: data.completed } : t);
+                            this.$nextTick(() => lucide.createIcons());
+                        }
+                    } catch (e) { console.error('Toggle error:', e); }
+                },
+
+                // Opens the custom modal instead of browser confirm
+                deleteTask(id) {
+                    this.taskToDelete = id;
+                    this.isDeleteOpen  = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                async confirmDelete() {
+                    if (!this.taskToDelete) return;
+                    try {
+                        const res  = await fetch(`/tasks/delete/${this.taskToDelete}/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            this.tasks = this.tasks.filter(t => t.id !== this.taskToDelete);
+                        }
+                    } catch (e) {
+                        console.error('Delete error:', e);
+                    } finally {
+                        this.isDeleteOpen  = false;
+                        this.taskToDelete  = null;
+                    }
+                },
+
+                async addTask() {
+                    if (!this.newTask.title || !this.newTask.priority || !this.newTask.dueDate) return;
+                    this.isAdding = true;
+                    const url = this.isEditMode ? `/tasks/edit/${this.currentTaskId}/` : '/tasks/add/';
+                    try {
+                        const res  = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newTask)
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            if (this.isEditMode) {
+                                this.tasks = this.tasks.map(t => t.id === this.currentTaskId ? data.task : t);
+                            } else {
+                                this.tasks.push(data.task);
+                            }
+                            this.resetForm();
+                            setTimeout(() => {
+                                this.isDialogOpen = false;
+                                this.$nextTick(() => lucide.createIcons());
+                            }, 300);
+                        }
+                    } catch (e) {
+                        console.error('Save error:', e);
+                    } finally {
+                        this.isAdding = false;
+                    }
+                },
+
+                openEditModal(task) {
+                    this.isEditMode    = true;
+                    this.currentTaskId = task.id;
+                    this.newTask       = { ...task };
+                    this.isDialogOpen  = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                resetForm() {
+                    this.isEditMode    = false;
+                    this.currentTaskId = null;
+                    this.newTask       = { title: '', category: 'General', priority: '', dueDate: '' };
+                },
+
+                getPriorityStyle(priority) {
+                    switch (priority) {
+                        case 'High':   return 'background-color:#FEE2E2;color:#991B1B;border-color:#FCA5A5';
+                        case 'Medium': return 'background-color:#FEF3C7;color:#92400E;border-color:#FCD34D';
+                        case 'Low':    return 'background-color:#DBEAFE;color:#1E40AF;border-color:#93C5FD';
+                        default:       return 'background-color:#F3F4F6;color:#4B5563;border-color:#D1D5DB';
+                    }
+                },
+
+                init() { this.$nextTick(() => lucide.createIcons()); }
+            }
+        }
+    </script>
+</body>
+</html>

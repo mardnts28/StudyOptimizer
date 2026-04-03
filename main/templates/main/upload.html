@@ -1,0 +1,451 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload & Summarize - StudyOptimizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="icon" type="image/png" href="{% static 'main/images/logo.png' %}">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-[#FCF9F9] min-h-screen">
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="/dashboard/" class="flex items-center gap-2">
+                <img src="{% static 'main/images/logo.png' %}" alt="Logo" class="w-10 h-10 object-contain">
+                <span class="font-bold text-gray-900">StudyOptimizer</span>
+            </a>
+            <div class="flex items-center gap-6 text-sm font-medium text-gray-500">
+                <a href="/dashboard/" class="hover:text-gray-900 transition-colors">Dashboard</a>
+                <a href="/upload/" class="bg-red-50 text-red-700 px-4 py-2 rounded-full">Upload</a>
+                <a href="/tasks/" class="hover:text-gray-900 transition-colors">Tasks</a>
+                <a href="/collaborate/" class="hover:text-gray-900 transition-colors">Collaborate</a>
+                <a href="/progress/" class="hover:text-gray-900 transition-colors">Progress</a>
+                <a href="/profile/" class="hover:text-gray-900 transition-colors">Profile</a>
+                <div class="w-px h-6 bg-gray-200 mx-2"></div>
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="flex items-center gap-2 hover:text-gray-900 transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </nav>
+    {% if messages %}
+    <div class="max-w-5xl mx-auto px-6 mt-4 space-y-2">
+        {% for message in messages %}
+        <div class="p-4 rounded-xl font-bold text-sm {% if message.tags == 'error' %}bg-red-50 text-red-700 border-2 border-red-100{% elif message.tags == 'success' %}bg-green-50 text-green-700 border-2 border-green-100{% else %}bg-blue-50 text-blue-700 border-2 border-blue-100{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Content -->
+    <div x-data="uploadApp()" class="max-w-6xl mx-auto px-6 py-12">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Upload Card -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                    <!-- Header -->
+                    <div class="bg-[#FFF8F8] p-6 border-b border-gray-50 flex items-center gap-2">
+                        <i data-lucide="zap" class="w-5 h-5 text-[#8C1007]"></i>
+                        <h2 class="font-bold text-lg text-[#8C1007]">Upload Your Document</h2>
+                        <span class="text-lg">📄</span>
+                    </div>
+
+                    <div class="p-8">
+                        <form @submit.prevent="handleSubmit" class="space-y-8">
+                            <!-- Drop Zone -->
+                            <div>
+                                <label class="block text-sm font-bold text-[#8C1007] mb-4">Drop your file here</label>
+                                <div class="relative" 
+                                     @dragover.prevent="isDragging = true" 
+                                     @dragleave.prevent="isDragging = false"
+                                     @drop.prevent="handleDrop($event)">
+                                    
+                                    <div :class="isDragging ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'" 
+                                         class="flex justify-center px-6 py-16 border-2 border-dashed rounded-[2.5rem] transition-all">
+                                        <div class="text-center">
+                                            <label for="file-upload" class="cursor-pointer mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-[#A8100C] shadow-lg hover:bg-[#7a0d06] transition-colors">
+                                                <i data-lucide="upload" class="h-10 w-10 text-white"></i>
+                                            </label>
+                                            <div class="space-y-2">
+                                                <div class="text-xl flex items-baseline justify-center gap-1">
+                                                    <label for="file-upload" class="cursor-pointer font-bold text-[#A8100C] hover:underline">
+                                                        <span>Click to upload</span>
+                                                        <input id="file-upload" type="file" class="sr-only" @change="handleFileChange" accept=".pdf,.docx,.pptx,.txt" multiple>
+                                                    </label>
+                                                    <span class="text-gray-500 font-medium">or drag and drop</span>
+                                                </div>
+                                                <p class="text-sm text-gray-400 font-medium tracking-wide">PDF, DOC, PPT, TXT up to 10MB</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Selected Files (Green Theme) -->
+                                    <template x-if="selectedFiles.length > 0">
+                                        <div class="mt-8 space-y-4">
+
+                                            <template x-for="(file, index) in selectedFiles" :key="index">
+                                                <div class="p-5 bg-[#F4FFF8] border border-[#D1F7E2] rounded-3xl flex items-center gap-4 transition-all">
+                                                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-gray-300">
+                                                        <i data-lucide="file-text" class="w-6 h-6"></i>
+                                                    </div>
+                                                    <div class="flex-1 min-w-0">
+                                                        <div class="font-bold text-sm text-gray-900 truncate" x-text="file.name"></div>
+                                                        <div class="text-xs text-gray-400 font-medium" x-text="(file.size / 1024).toFixed(1) + ' KB'"></div>
+                                                    </div>
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="flex items-center justify-center w-8 h-8 rounded-full border-2 border-green-400">
+                                                            <i data-lucide="check" class="w-5 h-5 text-green-500"></i>
+                                                        </div>
+                                                        <button @click.prevent="removeFile(index)" class="p-1 text-gray-300 hover:text-red-500 transition-colors">
+                                                            <i data-lucide="x" class="w-5 h-5"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Footer Section -->
+                            <div class="space-y-6">
+                                <template x-if="errorMessage">
+                                    <div class="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-sm font-bold flex items-center gap-2">
+                                        <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                                        <span x-text="errorMessage"></span>
+                                    </div>
+                                </template>
+
+                                <button type="submit" 
+                                        :disabled="selectedFiles.length === 0 || isProcessing"
+                                        :class="(selectedFiles.length === 0 || isProcessing) ? 'bg-[#F3F4F6] text-gray-300 cursor-not-allowed border-transparent' : 'bg-gradient-to-r from-[#8C1007] to-[#A8100C] text-white hover:shadow-xl hover:scale-[1.01] active:scale-[0.98] border-transparent'"
+                                        class="w-full py-5 rounded-3xl font-bold flex items-center justify-center gap-3 transition-all border shadow-lg shadow-red-100">
+                                    <template x-if="isProcessing">
+                                        <span class="flex items-center gap-3">
+                                            <div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            <span x-text="'Processing ' + currentFileIndex + '/' + selectedFiles.length"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!isProcessing">
+                                        <span class="flex items-center gap-2">
+                                            <i data-lucide="zap" class="w-5 h-5"></i>
+                                            Generate Summary ✨
+                                        </span>
+                                    </template>
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Summary Display -->
+                        <template x-if="summary">
+                            <div class="mt-10 p-8 bg-gradient-to-br from-[#F4FFF8] to-white rounded-[2.5rem] border border-[#D1F7E2] shadow-sm">
+                                <div class="flex items-center gap-3 mb-6">
+                                    <i data-lucide="sparkles" class="w-6 h-6 text-green-600"></i>
+                                    <h3 class="font-bold text-xl text-gray-900 flex-1" x-text="title || 'Summary Ready!'"></h3>
+                                    <template x-if="currentDocId">
+                                        <a :href="'/summarize/download/' + currentDocId + '/'" class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-md">
+                                            <i data-lucide="download" class="w-4 h-4"></i>
+                                            Download PDF
+                                        </a>
+                                    </template>
+                                </div>
+                                <div class="text-sm text-gray-700 leading-relaxed font-medium whitespace-pre-line" x-html="summary"></div>
+
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Sidebar -->
+            <div class="space-y-8">
+                <div class="bg-white rounded-[2.5rem] border border-gray-50 shadow-sm overflow-hidden sticky top-24">
+                    <div class="bg-[#FFF8F8] p-6 border-b border-gray-50 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-lg text-gray-900">Recent Summaries</h3>
+                            <span class="text-lg">📚</span>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="space-y-5 mb-10 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
+                            <template x-for="item in recentSummaries" :key="item.id">
+                                <button @click="viewSummary(item)" class="w-full text-left p-5 bg-white border border-gray-50 rounded-3xl hover:border-red-100 transition-all hover:shadow-xl hover:-translate-y-1 group">
+                                    <div class="flex items-center gap-5">
+                                        <div class="text-4xl group-hover:scale-110 transition-transform" x-text="item.emoji"></div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-bold text-sm text-gray-900 mb-2 truncate" x-text="item.title"></div>
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-[10px] font-bold text-gray-300" x-text="item.date"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button>
+                            </template>
+                            <template x-if="recentSummaries.length === 0">
+                                <div class="text-center py-10">
+                                    <p class="text-gray-400 text-sm font-medium">No recent summaries yet</p>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Pro Tip Card -->
+                        <div class="p-6 bg-gradient-to-br from-[#FFFBEB] to-[#FFF5D1] rounded-[2rem] border border-[#FEF3C7] shadow-sm relative overflow-hidden group">
+                            <div class="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform">
+                                <i data-lucide="lightbulb" class="w-24 h-24 text-amber-500"></i>
+                            </div>
+                            <div class="text-3xl mb-4">💡</div>
+                            <div class="font-bold text-sm text-gray-900 mb-2">Pro Tip!</div>
+                            <p class="text-[11px] leading-relaxed text-gray-600 font-bold">
+                                Upload multiple files at once to save time! We support batch processing.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Bridges -->
+    {{ recent_summaries|json_script:"recent-summaries-json" }}
+
+    <script>
+        function uploadApp() {
+            let initialData = [];
+            try {
+                initialData = JSON.parse(document.getElementById('recent-summaries-json').textContent);
+            } catch (e) {
+                console.error("Failed to parse initial data", e);
+            }
+
+            return {
+                selectedFiles: [],
+                category: 'General',
+                isProcessing: false,
+                isDragging: false,
+                currentFileIndex: 0,
+                summary: '', currentDocId: null,
+                title: '',
+                errorMessage: '',
+                recentSummaries: initialData,
+
+                formatSummary(text) {
+                    if (!text) return '';
+                    return text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+                },
+                init() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const openId    = urlParams.get('open');
+                    if (openId) {
+                        const item = this.recentSummaries.find(s => s.id == openId);
+                        if (item) this.viewSummary(item);
+                    }
+                    this.$nextTick(() => { if(window.lucide) lucide.createIcons() });
+                },
+                
+                handleFileChange(e) {
+                    if (e.target.files) {
+                        this.processSelectedFiles(e.target.files);
+                    }
+                },
+
+                handleDrop(e) {
+                    this.isDragging = false;
+                    if (e.dataTransfer.files) {
+                        this.processSelectedFiles(e.dataTransfer.files);
+                    }
+                },
+
+                processSelectedFiles(fileList) {
+                    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+                    const newFiles = Array.from(fileList).filter(f => {
+                        // Check if file is already in selectedFiles
+                        const isDuplicate = this.selectedFiles.some(existing => 
+                            existing.name === f.name && existing.size === f.size
+                        );
+                        if (isDuplicate) return false;
+
+                        // Check size
+                        if (f.size > MAX_SIZE) {
+                            this.errorMessage = `File "${f.name}" is too large (max 10MB)`;
+                            return false;
+                        }
+                        return true;
+                    }).map(f => ({
+                        name: f.name,
+                        size: f.size,
+                        raw: f
+                    }));
+
+                    this.selectedFiles = [...this.selectedFiles, ...newFiles].slice(0, 10);
+                },
+
+                removeFile(index) {
+                    this.selectedFiles.splice(index, 1);
+                },
+                
+                async handleSubmit() {
+                    if (this.selectedFiles.length === 0) return;
+                    
+                    this.isProcessing = true;
+                    this.summary = '';
+                    this.title = '';
+                    this.errorMessage = '';
+                    this.currentFileIndex = 0;
+                    let processedDocIds = [];
+                    let individualSummariesText = "";
+
+                    for (let i = 0; i < this.selectedFiles.length; i++) {
+                        this.currentFileIndex = i + 1;
+                        const fileObj = this.selectedFiles[i];
+                        
+                        const formData = new FormData();
+                        formData.append('file', fileObj.raw);
+                        formData.append('category', this.category);
+                        
+                        try {
+                            const response = await fetch('/summarize/', {
+                                method: 'POST',
+                                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                                body: formData
+                            });
+                            
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                try {
+                                    const errorData = JSON.parse(errorText);
+                                    this.errorMessage = errorData.message || `Server error during ${fileObj.name}`;
+                                } catch (e) {
+                                    this.errorMessage = `Network Error (Status ${response.status}): The server encountered an issue.`;
+                                }
+                                this.isProcessing = false;
+                                return;
+                            }
+                            
+                            const data = await response.json();
+                            if (data.status === 'success') {
+                                // Add individual file summary with a separator for the aggregate view
+                                individualSummariesText += `📄 File ${i+1} – ${fileObj.name}\n${data.summary}\n\n`;
+                                processedDocIds.push(data.doc_id);
+                                
+                                // Add to sidebar list
+                                const newItem = {
+                                    id: data.doc_id,
+                                    title: fileObj.name,
+                                    date: 'Just Now',
+                                    emoji: '📄',
+                                    summary: data.summary,
+                                    isBatch: false
+                                };
+                                this.recentSummaries.unshift(newItem);
+                            } else {
+                                this.errorMessage = data.message || `Failed to process ${fileObj.name}`;
+                            }
+                        } catch (error) {
+                            console.error('CRITICAL: Upload/Summarize fetch failed!', error);
+                            this.errorMessage = `Connection error (${error.message}). Please check the console.`;
+                        }
+                    }
+
+                    // --- Batch Integration Step ---
+                    if (processedDocIds.length > 1 && !this.errorMessage) {
+                        try {
+                            const batchResponse = await fetch('/summarize_batch/', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': '{{ csrf_token }}'
+                                },
+                                body: JSON.stringify({
+                                    doc_ids: processedDocIds,
+                                    category: this.category
+                                })
+                            });
+                            
+                            if (!batchResponse.ok) {
+                                this.errorMessage = "Individual files saved, but Master Synthesis failed.";
+                                this.summary = individualSummariesText;
+                                this.title = "Individual Summaries";
+                                this.isProcessing = false;
+                                return;
+                            }
+                            
+                            const batchData = await batchResponse.json();
+                            if (batchData.status === 'success') {
+                                this.summary = this.formatSummary(batchData.full_summary || (individualSummariesText + "🔄 --- Master AI Synthesis ---\n\n" + batchData.combined_summary));
+                                this.currentDocId = batchData.batch_doc_id;
+                                this.title = batchData.batch_title;
+                                
+                                // Prepend batch item to sidebar
+                                this.recentSummaries.unshift({
+                                    id: batchData.batch_doc_id,
+                                    title: batchData.batch_title,
+                                    date: 'Just Now',
+                                    emoji: '📊',
+                                    summary: this.summary, // Keep the full context for batch view
+                                    isBatch: true
+                                });
+                            }
+                        } catch (e) {
+                            console.error("Batch integration failed", e);
+                            this.summary = individualSummariesText;
+                            this.title = "Individual Summaries Processed";
+                        }
+                    } else if (processedDocIds.length === 1 && !this.errorMessage) {
+                        // Single file uploaded
+                        this.currentDocId = processedDocIds[0];
+                        const lastSummary = this.recentSummaries[0].summary;
+                        this.summary = this.formatSummary(lastSummary);
+                        this.title = `📘 ${this.recentSummaries[0].title}`;
+                    }
+
+                    if (!this.errorMessage) {
+                        this.selectedFiles = [];
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    this.isProcessing = false;
+                    this.$nextTick(() => { if(window.lucide) lucide.createIcons() });
+                },
+                
+                viewSummary(item) {
+                    this.errorMessage = '';
+                    this.currentDocId = item.id;
+                    this.title = item.isBatch ? item.title : `📘 ${item.title}`;
+                    this.summary = this.formatSummary(item.summary);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        }
+        
+        document.addEventListener("DOMContentLoaded", function() {
+            if(window.lucide) lucide.createIcons();
+        });
+    </script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #fdf2f2;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #fecaca;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #fca5a5;
+        }
+    </style>
+</body>
+</html>

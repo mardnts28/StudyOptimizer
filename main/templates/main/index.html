@@ -1,0 +1,250 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyOptimizer - AI-Powered Study Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="icon" type="image/png" href="{% static 'main/images/logo.png' %}">
+</head>
+<body class="bg-gradient-to-br from-white via-red-50/30 to-white min-h-screen">
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-50">
+        <nav class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center gap-2">
+                <img src="{% static 'main/images/logo.png' %}" alt="Logo" class="w-10 h-10 object-contain">
+
+                <span class="font-bold text-gray-900">StudyOptimizer</span>
+            </a>
+            <div class="flex items-center gap-3">
+                {% if user.is_authenticated %}
+                <a href="/dashboard/">
+                    <button class="text-sm font-semibold bg-red-600 text-white px-5 py-2 rounded-md shadow-lg shadow-red-200/50 hover:shadow-xl transition-all">
+                        Go to Dashboard 🚀
+                    </button>
+                </a>
+                <a href="{% url 'logout' %}">
+                    <button class="text-sm font-medium text-gray-600 hover:text-gray-900 px-4 py-2">Logout</button>
+                </a>
+                {% else %}
+                <a href="/login/">
+                    <button class="text-sm font-medium text-gray-600 hover:text-gray-900 px-4 py-2">Sign in</button>
+                </a>
+                <a href="/register/">
+                    <button class="text-sm font-semibold bg-gray-900 text-white px-5 py-2 rounded-md shadow-lg shadow-red-200/50 hover:shadow-xl transition-all">
+                        Get started free ✨
+                    </button>
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="max-w-6xl mx-auto px-6 py-20">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 px-4 py-2 bg-red-50 rounded-full mb-6 border border-red-100">
+                <i data-lucide="sparkles" class="w-4 h-4" style="color: #8C1007;"></i>
+                <span class="text-sm font-medium" style="color: #8C1007;">AI-Powered Study Assistant</span>
+            </div>
+            
+            <h1 class="text-6xl font-bold text-gray-900 mb-6 leading-tight">
+                Study smarter,
+                <span class="bg-gradient-to-r from-red-600 via-red-500 to-red-400 bg-clip-text text-transparent">
+                    ace faster
+                </span>
+                <span class="inline-block animate-bounce">🚀</span>
+            </h1>
+            
+            <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
+                Your AI-powered study buddy that turns documents into summaries, tracks your progress, 
+                and helps you crush your academic goals!
+            </p>
+            
+            <div class="flex gap-4 justify-center flex-wrap">
+                {% if user.is_authenticated %}
+                <a href="/dashboard/">
+                    <button class="text-base font-bold bg-red-600 text-white px-8 py-4 rounded-md shadow-lg shadow-red-200/50 hover:shadow-xl transition-all flex items-center gap-2">
+                        Back to your Dashboard
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    </button>
+                </a>
+                {% else %}
+                <a href="/register/">
+                    <button class="text-base font-bold bg-gray-900 text-white px-8 py-4 rounded-md shadow-lg shadow-red-200/50 hover:shadow-xl transition-all flex items-center gap-2">
+                        Start learning for free
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </a>
+                {% endif %}
+                <div class="flex items-center gap-2 text-sm text-gray-600 bg-white px-6 py-3 rounded-lg border border-gray-100 shadow-sm">
+                    <i data-lucide="star" class="w-4 h-4 fill-yellow-400 text-yellow-400"></i>
+                    <span>Loved by <span class="font-bold text-gray-900">10,000+</span> students</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="max-w-6xl mx-auto px-6 py-16">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-gray-900 mb-3">
+                Everything you need to dominate your studies 📚
+            </h2>
+            <p class="text-gray-600">Powerful tools designed for modern students</p>
+        </div>
+        
+        <div class="grid md:grid-cols-3 gap-6">
+            <div class="group relative bg-white p-8 rounded-2xl border-2 border-gray-100 hover:border-red-200 transition-all hover:shadow-xl hover:-translate-y-1">
+                <div class="absolute -top-3 -right-3 w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-400 rounded-full flex items-center justify-center text-2xl animate-bounce">⚡</div>
+                <div class="w-14 h-14 rounded-2xl mx-auto mb-6 flex items-center justify-center transform group-hover:scale-110 transition-transform" 
+                     style="background: linear-gradient(135deg, #8C1007 0%, #660B05 100%)">
+                    <i data-lucide="file-text" class="w-7 h-7 text-white"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-3 text-center">AI Summarization</h3>
+                <p class="text-gray-600 text-center">Upload any doc and get instant AI summaries. No more reading 100-page PDFs! 🎯</p>
+            </div>
+
+            <div class="group relative bg-white p-8 rounded-2xl border-2 border-gray-100 hover:border-red-200 transition-all hover:shadow-xl hover:-translate-y-1">
+                <div class="absolute -top-3 -right-3 w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full flex items-center justify-center text-2xl animate-bounce" style="animation-delay: 0.1s">✓</div>
+                <div class="w-14 h-14 rounded-2xl mx-auto mb-6 flex items-center justify-center transform group-hover:scale-110 transition-transform" 
+                     style="background: linear-gradient(135deg, #660B05 0%, #3E0703 100%)">
+                    <i data-lucide="check-square" class="w-7 h-7 text-white"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-3 text-center">Smart Task Manager</h3>
+                <p class="text-gray-600 text-center">Organize tasks by category or project. Never miss a deadline again! 📅</p>
+            </div>
+
+            <div class="group relative bg-white p-8 rounded-2xl border-2 border-gray-100 hover:border-red-200 transition-all hover:shadow-xl hover:-translate-y-1">
+                <div class="absolute -top-3 -right-3 w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-2xl animate-bounce" style="animation-delay: 0.2s">📊</div>
+                <div class="w-14 h-14 rounded-2xl mx-auto mb-6 flex items-center justify-center transform group-hover:scale-110 transition-transform" 
+                     style="background: linear-gradient(135deg, #8C1007 0%, #B91C1C 100%)">
+                    <i data-lucide="trending-up" class="w-7 h-7 text-white"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-3 text-center">Progress Analytics</h3>
+                <p class="text-gray-600 text-center">Track your study hours, see your growth, and celebrate wins! 🎉</p>
+            </div>
+        </div>
+
+        <!-- Collaborative Learning Section -->
+        <div class="mt-8 group relative bg-gradient-to-r from-red-50 to-orange-50 p-8 rounded-2xl border-2 border-red-100 hover:border-red-300 transition-all hover:shadow-xl flex flex-col md:flex-row items-center gap-8">
+            <div class="absolute -top-3 -right-3 w-12 h-12 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-2xl animate-bounce" style="animation-delay: 0.3s">🤝</div>
+            <div class="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 transform group-hover:scale-110 transition-transform"
+                 style="background: linear-gradient(135deg, #3E0703 0%, #8C1007 100%)">
+                <i data-lucide="award" class="w-10 h-10 text-white"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Collaborative Learning 🌟</h3>
+                <p class="text-gray-600">Share your AI-generated summaries with classmates, like and comment on study materials, and build a knowledge community. Learning is 40% more effective together! 💪</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="bg-gradient-to-br from-red-50 to-white py-20 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-red-100/50 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 left-0 w-64 h-64 bg-orange-100/50 rounded-full blur-3xl"></div>
+        
+        <div class="max-w-6xl mx-auto px-6 relative">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-3">Get started in 3 easy steps 🎯</h2>
+                <p class="text-gray-600">It's literally that simple!</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8 text-center">
+                <div>
+                    <div class="relative inline-block mb-6">
+                        <div class="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl hover:scale-110 transition-transform" 
+                             style="background: linear-gradient(135deg, #8C1007 0%, #DC2626 100%)">1</div>
+                        <div class="absolute -top-2 -right-2 text-3xl animate-spin-slow">✨</div>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Upload Your Stuff</h3>
+                    <p class="text-gray-600">Drop your PDFs, notes, or slides. We handle the rest! 📄</p>
+                </div>
+                <div>
+                    <div class="relative inline-block mb-6">
+                        <div class="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl hover:scale-110 transition-transform" 
+                             style="background: linear-gradient(135deg, #660B05 0%, #B91C1C 100%)">2</div>
+                        <div class="absolute -top-2 -right-2 text-3xl animate-bounce">🤖</div>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">AI Does the Magic</h3>
+                    <p class="text-gray-600">Our AI creates perfect summaries in seconds. Like magic! ✨</p>
+                </div>
+                <div>
+                    <div class="relative inline-block mb-6">
+                        <div class="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl hover:scale-110 transition-transform" 
+                             style="background: linear-gradient(135deg, #3E0703 0%, #8C1007 100%)">3</div>
+                        <div class="absolute -top-2 -right-2 text-3xl animate-pulse">🎉</div>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Ace Your Exams</h3>
+                    <p class="text-gray-600">Study smarter, track progress, get better grades! 🏆</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Social Proof Section -->
+    <section class="max-w-6xl mx-auto px-6 py-20">
+        <div class="bg-white rounded-3xl p-12 border-2 border-gray-100 shadow-xl text-center">
+            <div class="flex justify-center gap-1 mb-4 text-yellow-400">
+                <i data-lucide="star" class="w-8 h-8 fill-current"></i>
+                <i data-lucide="star" class="w-8 h-8 fill-current"></i>
+                <i data-lucide="star" class="w-8 h-8 fill-current"></i>
+                <i data-lucide="star" class="w-8 h-8 fill-current"></i>
+                <i data-lucide="star" class="w-8 h-8 fill-current"></i>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900 mb-8">Students love us! 💖</h2>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-gradient-to-br from-red-50 to-white p-6 rounded-2xl border border-red-100 text-left">
+                    <p class="text-gray-700 mb-4">"This app literally saved my GPA! The AI summaries are spot on 🎯"</p>
+                    <div class="font-bold text-gray-900">- Sarah, Computer Science</div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-50 to-white p-6 rounded-2xl border border-orange-100 text-left">
+                    <p class="text-gray-700 mb-4">"Finally, an app that gets students. Love the task tracking! 📚"</p>
+                    <div class="font-bold text-gray-900">- Mike, Engineering</div>
+                </div>
+                <div class="bg-gradient-to-br from-red-50 to-white p-6 rounded-2xl border border-red-100 text-left">
+                    <p class="text-gray-700 mb-4">"Game changer! I study half the time and get better results 🚀"</p>
+                    <div class="font-bold text-gray-900">- Alex, Business</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="max-w-6xl mx-auto px-6 py-20">
+        <div class="bg-gradient-to-r from-red-600 via-red-500 to-red-400 rounded-3xl p-12 text-center text-white shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 text-9xl opacity-10">🎓</div>
+            <div class="absolute bottom-0 left-0 text-9xl opacity-10">📚</div>
+            
+            <div class="relative">
+                <h2 class="text-4xl font-bold mb-4">Ready to level up your study game? 🎮</h2>
+                <p class="text-xl mb-8 text-red-50">Join 10,000+ students who are already studying smarter</p>
+                <a href="/register/">
+                    <button class="bg-white text-gray-900 font-bold px-10 py-4 rounded-md shadow-xl hover:shadow-2xl transition-all">
+                        Start for free - No credit card needed ✨
+                    </button>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-100 bg-gray-50/50 py-12">
+        <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+            <a href="/" class="flex items-center gap-2">
+                <img src="{% static 'main/images/logo.png' %}" alt="Logo" class="w-8 h-8 object-contain">
+                <span class="font-bold text-gray-900">StudyOptimizer</span>
+            </a>
+            <p class="text-sm text-gray-600">Made with ❤️ for students everywhere</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
