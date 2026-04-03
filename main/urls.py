@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from django.contrib.auth.views import LogoutView
 
+
 urlpatterns = [
     path('', views.index, name='home'),
     path('register/', views.register, name='register'),
@@ -32,4 +33,11 @@ urlpatterns = [
     path('tasks/schedule/delete/<int:item_id>/', views.delete_schedule_item, name='delete_schedule'),
     path('profile/', views.profile, name='profile'),
     path('profile/mfa/toggle/', views.toggle_mfa, name='toggle_mfa'),
+    path('search/', views.search_documents, name='search_documents'),
+    path('admin-panel/',                views.admin_dashboard,    name='admin_dashboard'),
+    path('admin-panel/users/',          views.admin_users,        name='admin_users'),
+    path('admin-panel/collaboration/',  views.admin_collaboration, name='admin_collaboration'),
+    path('admin-panel/ai/',             views.admin_ai,            name='admin_ai'),
+    path('admin-panel/analytics/',      views.admin_analytics,     name='admin_analytics'),
+    path('admin-panel/audit-logs/',     views.admin_audit,         name='admin_audit'),
 ]

@@ -159,7 +159,6 @@
                  x-transition:enter-start="opacity-0 scale-95"
                  x-transition:enter-end="opacity-100 scale-100"
                  class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border-2 border-gray-100">
-                <!-- Accent bar -->
                 <div class="p-6 border-b border-gray-100">
                     <h2 class="text-xl font-bold flex items-center gap-2">
                         <span x-text="isEditMode ? 'Edit Task' : 'Create New Task'"></span>
@@ -253,7 +252,9 @@
                 </div>
             </div>
         </div>
-    </div>
+
+    </div><!-- end Alpine wrapper -->
+
     <script>
         function taskManager() {
             return {
@@ -263,7 +264,7 @@
                 isEditMode: false,
                 currentTaskId: null,
                 taskToDelete: null,
-                newTask: { title: '', category: 'General', priority: '', dueDate: '' },
+                newTask: { title: '', period: 'General', priority: '', dueDate: '' },
                 tasks: JSON.parse('{{ tasks_data|safe }}'),
 
                 activeTasks()    { return this.tasks.filter(t => !t.completed); },
@@ -354,7 +355,7 @@
                 resetForm() {
                     this.isEditMode    = false;
                     this.currentTaskId = null;
-                    this.newTask       = { title: '', category: 'General', priority: '', dueDate: '' };
+                    this.newTask       = { title: '', period: 'General', priority: '', dueDate: '' };
                 },
 
                 getPriorityStyle(priority) {

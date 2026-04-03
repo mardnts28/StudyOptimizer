@@ -1,0 +1,370 @@
+{% extends "main/admin/admin_base.html" %}
+{% block title %}User Management — StudyOptimizer Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+  .page-title   { font-size:26px; font-weight:700; color:#1A1A1A; margin-bottom:4px; }
+  .page-sub     { font-size:14px; color:#6B7280; margin-bottom:28px; }
+
+  .stats-row    { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; }
+  .stat-card    { background:#fff; border-radius:14px; border:1px solid #F0E4E4; padding:22px 24px; display:flex; align-items:center; gap:18px; }
+  .stat-icon    { width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#7B1818,#9B2020); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .stat-icon i  { color:#fff; font-size:20px; }
+  .stat-num     { font-size:28px; font-weight:700; color:#1A1A1A; line-height:1; }
+  .stat-lbl     { font-size:13px; color:#6B7280; margin-top:3px; }
+
+  .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .section-title  { font-size:15px; font-weight:700; color:#7B1818; }
+
+  .search-wrap { position:relative; }
+  .search-wrap i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#9CA3AF; font-size:14px; }
+  .search-wrap input { padding:9px 14px 9px 38px; border:1px solid #E5E7EB; border-radius:10px; font-size:13px; outline:none; width:280px; color:#374151; background:#FAFAFA; }
+  .search-wrap input:focus { border-color:#7B1818; background:#fff; }
+
+  .dir-card  { background:#fff; border-radius:14px; border:1px solid #F0E4E4; overflow:visible; }
+  .dir-row   { display:flex; align-items:center; padding:16px 20px; border-bottom:1px solid #F7EDED; transition:background .15s; position:relative; }
+  .dir-row:last-child { border-bottom:none; }
+  .dir-row:hover { background:#FDF6F6; }
+
+  .avatar    { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#7B1818,#9B2020); display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px; font-weight:700; flex-shrink:0; margin-right:14px; }
+  .u-name    { font-size:14px; font-weight:600; color:#1A1A1A; }
+  .u-email   { font-size:12px; color:#9CA3AF; margin-top:1px; }
+  .badge-active   { background:#DCFCE7; color:#16A34A; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:8px; }
+  .badge-inactive { background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:8px; }
+  .badge-admin    { background:#EDE9FE; color:#7C3AED; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:8px; }
+
+  .u-meta  { margin-left:auto; display:flex; align-items:center; gap:32px; }
+  .meta-col { text-align:left; }
+  .meta-lbl { font-size:11px; color:#9CA3AF; }
+  .meta-val { font-size:13px; font-weight:600; color:#1A1A1A; margin-top:1px; }
+
+  /* 3-dot button */
+  .menu-btn { background:none; border:none; cursor:pointer; color:#9CA3AF; font-size:16px; padding:4px 8px; margin-left:16px; border-radius:6px; }
+  .menu-btn:hover { color:#7B1818; background:#FEF2F2; }
+
+  /* dropdown */
+  .dropdown-menu { display:none; position:absolute; right:12px; top:48px; background:#fff; border:1px solid #E5E7EB; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.12); z-index:999; min-width:200px; overflow:hidden; }
+  .dropdown-menu.open { display:block; }
+  .dropdown-item { display:flex; align-items:center; gap:10px; padding:10px 16px; font-size:13px; color:#374151; cursor:pointer; transition:background .12s; border:none; background:none; width:100%; text-align:left; }
+  .dropdown-item:hover { background:#F9FAFB; color:#111827; }
+  .dropdown-item.danger { color:#DC2626; }
+  .dropdown-item.danger:hover { background:#FEF2F2; }
+  .dropdown-item i { width:16px; opacity:.65; }
+
+  /* toast */
+  #toast { position:fixed; bottom:28px; right:28px; background:#1A1A1A; color:#fff; padding:12px 20px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; pointer-events:none; z-index:9999; }
+  #toast.show { opacity:1; }
+
+  /* modal overlay */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:#fff; border-radius:16px; padding:28px; width:440px; max-width:95vw; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+  .modal-title { font-size:18px; font-weight:700; color:#1A1A1A; margin-bottom:8px; }
+  .modal-sub   { font-size:13px; color:#6B7280; margin-bottom:20px; }
+  .modal-input { width:100%; border:1px solid #E5E7EB; border-radius:8px; padding:9px 12px; font-size:13px; outline:none; margin-bottom:12px; box-sizing:border-box; }
+  .modal-input:focus { border-color:#7B1818; }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
+  .btn-cancel { padding:8px 18px; border:1px solid #E5E7EB; border-radius:8px; font-size:13px; cursor:pointer; background:#fff; }
+  .btn-confirm { padding:8px 18px; border:none; border-radius:8px; font-size:13px; cursor:pointer; background:#7B1818; color:#fff; font-weight:600; }
+  .btn-danger  { background:#DC2626; }
+
+  /* profile modal */
+  .profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+  .profile-field label { font-size:11px; color:#9CA3AF; display:block; margin-bottom:3px; }
+  .profile-field span  { font-size:13px; font-weight:600; color:#1A1A1A; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-title">User Management</div>
+<div class="page-sub">Manage student accounts and monitor engagement</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+    <div><div class="stat-num">{{ active_users }}</div><div class="stat-lbl">Active Users</div></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-circle-check"></i></div>
+    <div><div class="stat-num">{{ total_tasks_completed }}</div><div class="stat-lbl">Total Tasks Completed</div></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-fire"></i></div>
+    <div><div class="stat-num">{{ avg_streak }}</div><div class="stat-lbl">Average Streak</div></div>
+  </div>
+</div>
+
+<!-- DIRECTORY -->
+<div class="section-header">
+  <div class="section-title">User Directory</div>
+  <div class="search-wrap">
+    <i class="fas fa-search"></i>
+    <input type="text" id="userSearch" placeholder="Search by name, email, or major...">
+  </div>
+</div>
+
+<div class="dir-card" id="userList">
+  {% for u in user_list %}
+  <div class="dir-row user-row"
+       data-id="{{ u.id }}"
+       data-name="{{ u.full_name }}"
+       data-active="{{ u.is_active|yesno:'true,false' }}"
+       data-staff="{{ u.is_staff|yesno:'true,false' }}">
+
+    <div class="avatar">{{ u.initials }}</div>
+    <div>
+      <div class="u-name">
+        {{ u.full_name }}
+        {% if u.is_active %}<span class="badge-active">active</span>{% else %}<span class="badge-inactive">inactive</span>{% endif %}
+        {% if u.is_staff %}<span class="badge-admin">admin</span>{% endif %}
+      </div>
+      <div class="u-email">{{ u.email }}</div>
+    </div>
+
+    <div class="u-meta">
+      <div class="meta-col"><div class="meta-lbl">Major</div><div class="meta-val">{{ u.major }}</div></div>
+      <div class="meta-col"><div class="meta-lbl">Streak</div><div class="meta-val">{{ u.streak }} days</div></div>
+      <div class="meta-col"><div class="meta-lbl">Tasks</div><div class="meta-val">{{ u.task_count }}</div></div>
+    </div>
+
+    <button class="menu-btn" onclick="toggleMenu(event, this)"><i class="fas fa-ellipsis-vertical"></i></button>
+
+    <div class="dropdown-menu">
+      <button class="dropdown-item" onclick="doViewProfile(this)"><i class="fas fa-eye"></i> View Profile</button>
+      <button class="dropdown-item" onclick="doSendEmail(this)"><i class="fas fa-envelope"></i> Send Email</button>
+      <button class="dropdown-item" onclick="doToggleAccount(this)">
+        <i class="fas fa-ban"></i>
+        <span class="toggle-label">{% if u.is_active %}Disable Account{% else %}Enable Account{% endif %}</span>
+      </button>
+      <button class="dropdown-item" onclick="doResetPassword(this)"><i class="fas fa-rotate-right"></i> Reset Password</button>
+      <button class="dropdown-item" onclick="doToggleAdmin(this)">
+        <i class="fas fa-shield"></i>
+        <span class="admin-label">{% if u.is_staff %}Revoke Admin Access{% else %}Grant Admin Access{% endif %}</span>
+      </button>
+      <button class="dropdown-item danger" onclick="doDeleteAccount(this)"><i class="fas fa-trash"></i> Delete Account</button>
+    </div>
+  </div>
+  {% empty %}
+  <div class="dir-row"><span style="color:#9CA3AF;font-size:14px;">No users found.</span></div>
+  {% endfor %}
+</div>
+
+<!-- ── MODALS ──────────────────────────────────────────────────────────── -->
+
+<!-- Send Email Modal -->
+<div class="modal-overlay" id="emailModal">
+  <div class="modal-box">
+    <div class="modal-title">Send Email</div>
+    <div class="modal-sub" id="emailModalSub">Sending to: —</div>
+    <input class="modal-input" id="emailSubject" placeholder="Subject">
+    <textarea class="modal-input" id="emailBody" rows="5" placeholder="Message…"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('emailModal')">Cancel</button>
+      <button class="btn-confirm" onclick="submitEmail()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Profile Modal -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal-box">
+    <div class="modal-title">User Profile</div>
+    <div id="profileContent" style="color:#6B7280;font-size:13px;">Loading…</div>
+    <div class="modal-actions" style="margin-top:20px;">
+      <button class="btn-cancel" onclick="closeModal('profileModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal (reusable) -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <div class="modal-title" id="confirmTitle">Are you sure?</div>
+    <div class="modal-sub"  id="confirmSub"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
+      <button class="btn-confirm btn-danger" id="confirmBtn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+/* ── utils ───────────────────────────────────────────────────────────── */
+function getRow(el)  { return el.closest('.dir-row'); }
+function getUserId(el){ return getRow(el).dataset.id; }
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok ? '#16A34A' : '#DC2626';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+/* close dropdowns when clicking outside */
+document.addEventListener('click', () =>
+  document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'))
+);
+function toggleMenu(e, btn) {
+  e.stopPropagation();
+  const menu = btn.nextElementSibling;
+  document.querySelectorAll('.dropdown-menu.open').forEach(m => { if(m!==menu) m.classList.remove('open'); });
+  menu.classList.toggle('open');
+}
+
+/* ── View Profile ─────────────────────────────────────────────────────── */
+function doViewProfile(btn) {
+  const id = getUserId(btn);
+  openModal('profileModal');
+  document.getElementById('profileContent').innerHTML = 'Loading…';
+  fetch(`/admin-panel/users/${id}/profile/`)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('profileContent').innerHTML = `
+        <div class="profile-grid">
+          <div class="profile-field"><label>Full Name</label><span>${d.full_name||'—'}</span></div>
+          <div class="profile-field"><label>Username</label><span>${d.username}</span></div>
+          <div class="profile-field"><label>Email</label><span>${d.email}</span></div>
+          <div class="profile-field"><label>Joined</label><span>${d.date_joined}</span></div>
+          <div class="profile-field"><label>Major</label><span>${d.major||'—'}</span></div>
+          <div class="profile-field"><label>Streak</label><span>${d.streak??'—'} days</span></div>
+          <div class="profile-field"><label>Status</label><span>${d.is_active?'Active':'Inactive'}</span></div>
+          <div class="profile-field"><label>Admin</label><span>${d.is_staff?'Yes':'No'}</span></div>
+        </div>`;
+    })
+    .catch(() => { document.getElementById('profileContent').textContent = 'Failed to load.'; });
+}
+
+/* ── Send Email ───────────────────────────────────────────────────────── */
+let _emailUserId = null;
+function doSendEmail(btn) {
+  _emailUserId = getUserId(btn);
+  const name   = getRow(btn).dataset.name;
+  document.getElementById('emailModalSub').textContent = `Sending to: ${name}`;
+  document.getElementById('emailSubject').value = '';
+  document.getElementById('emailBody').value    = '';
+  openModal('emailModal');
+}
+function submitEmail() {
+  const subject = document.getElementById('emailSubject').value.trim();
+  const message = document.getElementById('emailBody').value.trim();
+  if (!subject || !message) { toast('Fill in subject and message.', false); return; }
+  fetch(`/admin-panel/users/${_emailUserId}/send-email/`, {
+    method:'POST', headers:{'X-CSRFToken':CSRF,'Content-Type':'application/json'},
+    body: JSON.stringify({subject, message})
+  }).then(r=>r.json()).then(d => {
+    if (d.status==='ok') { closeModal('emailModal'); toast('Email sent & user notified ✉️'); }
+    else toast('Failed to send email.', false);
+  });
+}
+
+/* ── Disable / Enable Account ────────────────────────────────────────── */
+function doToggleAccount(btn) {
+  const row    = getRow(btn);
+  const id     = row.dataset.id;
+  const name   = row.dataset.name;
+  const active = row.dataset.active === 'true';
+  const action = active ? 'Disable' : 'Enable';
+  showConfirm(
+    `${action} account?`,
+    `${action} account for ${name}?`,
+    () => {
+      fetch(`/admin-panel/users/${id}/disable/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+        .then(r=>r.json()).then(d => {
+          if(d.status==='ok') {
+            row.dataset.active = d.is_active;
+            const badge = row.querySelector('.badge-active,.badge-inactive');
+            if (d.is_active) {
+              badge.className='badge-active'; badge.textContent='active';
+              btn.querySelector('.toggle-label').textContent='Disable Account';
+            } else {
+              badge.className='badge-inactive'; badge.textContent='inactive';
+              btn.querySelector('.toggle-label').textContent='Enable Account';
+            }
+            toast(`Account ${d.action} & user notified ✅`);
+          }
+        });
+    },
+    action==='Disable'
+  );
+}
+
+/* ── Reset Password ─────────────────────────────────────────────────── */
+function doResetPassword(btn) {
+  const id   = getUserId(btn);
+  const name = getRow(btn).dataset.name;
+  showConfirm('Reset password?', `Send a password-reset link to ${name}?`, () => {
+    fetch(`/admin-panel/users/${id}/reset-pw/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+      .then(r=>r.json()).then(d => {
+        if(d.status==='ok') toast('Reset link sent & user notified 🔑');
+      });
+  }, false);
+}
+
+/* ── Grant / Revoke Admin ────────────────────────────────────────────── */
+function doToggleAdmin(btn) {
+  const row   = getRow(btn);
+  const id    = row.dataset.id;
+  const name  = row.dataset.name;
+  const staff = row.dataset.staff === 'true';
+  const action = staff ? 'Revoke' : 'Grant';
+  showConfirm(`${action} admin access?`, `${action} admin access for ${name}?`, () => {
+    fetch(`/admin-panel/users/${id}/grant-admin/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+      .then(r=>r.json()).then(d => {
+        if(d.status==='ok') {
+          row.dataset.staff = d.is_staff;
+          btn.querySelector('.admin-label').textContent = d.is_staff ? 'Revoke Admin Access' : 'Grant Admin Access';
+          const uName = row.querySelector('.u-name');
+          const existing = uName.querySelector('.badge-admin');
+          if (d.is_staff && !existing) {
+            const b=document.createElement('span'); b.className='badge-admin'; b.textContent='admin'; uName.appendChild(b);
+          } else if (!d.is_staff && existing) {
+            existing.remove();
+          }
+          toast(`Admin access ${d.action} & user notified 🛡️`);
+        }
+      });
+  }, action==='Revoke');
+}
+
+/* ── Delete Account ─────────────────────────────────────────────────── */
+function doDeleteAccount(btn) {
+  const row  = getRow(btn);
+  const id   = row.dataset.id;
+  const name = row.dataset.name;
+  showConfirm('Delete account?', `Permanently delete ${name}'s account? This cannot be undone.`, () => {
+    fetch(`/admin-panel/users/${id}/delete/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+      .then(r=>r.json()).then(d => {
+        if(d.status==='ok') { row.remove(); toast(`${d.deleted_name}'s account deleted 🗑️`); }
+      });
+  }, true);
+}
+
+/* ── Confirm helper ─────────────────────────────────────────────────── */
+function showConfirm(title, sub, onConfirm, isDanger=false) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmSub').textContent   = sub;
+  const btn = document.getElementById('confirmBtn');
+  btn.className = 'btn-confirm' + (isDanger ? ' btn-danger' : '');
+  btn.onclick = () => { closeModal('confirmModal'); onConfirm(); };
+  openModal('confirmModal');
+}
+
+/* ── Search ─────────────────────────────────────────────────────────── */
+document.getElementById('userSearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.user-row').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

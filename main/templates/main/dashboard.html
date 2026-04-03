@@ -25,13 +25,10 @@
                 <a href="/progress/" class="hover:text-gray-900 transition-colors">Progress</a>
                 <a href="/profile/" class="hover:text-gray-900 transition-colors">Profile</a>
                 <div class="w-px h-6 bg-gray-200 mx-2"></div>
-                <form method="post" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="flex items-center gap-2 hover:text-gray-900 transition-colors">
-                        <i data-lucide="log-out" class="w-4 h-4"></i>
-                        Logout
-                    </button>
-                </form>
+                <a href="/logout/" class="flex items-center gap-2 hover:text-gray-900 transition-colors">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    Logout
+                </a>
             </div>
         </div>
     </nav>
@@ -41,7 +38,7 @@
             <div class="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <div class="flex items-center gap-3 mb-2">
-                        <h1 class="text-4xl font-bold text-gray-900" x-text="getGreeting() + ', {{ user.username }}! 👋'"></h1>
+                        <h1 class="text-4xl font-bold text-gray-900">Good morning, {{ user.username }}! 👋</h1>
                     </div>
                     <p class="text-gray-600">Here's your study overview for today</p>
                 </div>
@@ -255,41 +252,6 @@
                         </a>
                     </div>
                 </div>
-
-                <!-- Recent Summaries -->
-                <div class="bg-white rounded-2xl border-2 border-gray-100 shadow-xl overflow-hidden mt-6">
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-gray-100 p-6">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="book-open" class="w-5 h-5 text-indigo-700"></i>
-                            <h3 class="font-semibold text-lg text-gray-900">Recent Summaries</h3>
-                            <span class="text-lg">📚</span>
-                        </div>
-                    </div>
-                    <div class="p-4">
-                        <div class="space-y-3">
-                            <template x-for="item in recentSummaries" :key="item.id">
-                                <a :href="'/upload/?open=' + item.id" class="block p-3 border-2 border-gray-100 rounded-xl hover:border-indigo-200 transition-all hover:shadow-md group">
-                                    <div class="flex items-center gap-3">
-                                        <div class="text-2xl group-hover:scale-110 transition-transform" x-text="item.emoji"></div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="font-bold text-xs text-gray-900 truncate" x-text="item.title"></div>
-                                            <div class="text-[10px] text-gray-400 font-bold" x-text="item.date"></div>
-                                        </div>
-                                        <div class="text-indigo-500 opacity-0 group-hover:opacity-100 transition-all">
-                                            <i data-lucide="external-link" class="w-3 h-3"></i>
-                                        </div>
-                                    </div>
-                                </a>
-                            </template>
-                            <template x-if="recentSummaries.length === 0">
-                                <div class="text-center py-6">
-                                    <p class="text-xs text-gray-400 font-medium">No recent summaries found.</p>
-                                    <a href="/upload/" class="text-[10px] text-indigo-600 font-bold hover:underline">Create your first one!</a>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -325,98 +287,64 @@
                         <h2 class="text-xl font-bold text-gray-900">Study Schedule 📅</h2>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button @click="toggleForm()" class="p-2 hover:bg-red-50 text-gray-400 hover:text-red-700 rounded-lg transition-all" :title="(isScheduling || isEditing) ? 'Back to View' : 'Add Activity'">
-                            <i :data-lucide="(isScheduling || isEditing) ? 'arrow-left' : 'plus'" class="w-5 h-5"></i>
+                        <button @click="isScheduling = !isScheduling" class="p-2 hover:bg-red-50 text-gray-400 hover:text-red-700 rounded-lg transition-all" :title="isScheduling ? 'Back to View' : 'Add Activity'">
+                            <i :data-lucide="isScheduling ? 'arrow-left' : 'plus'" class="w-5 h-5"></i>
                         </button>
                         <button @click="showSchedule = false" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                             <i data-lucide="x" class="w-5 h-5 text-gray-500"></i>
                         </button>
                     </div>
                 </div>
-                <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                    <!-- Form Phase -->
-                    <div x-show="isScheduling || isEditing" class="space-y-4 bg-gray-50 p-6 rounded-2xl border-2 border-dashed border-red-200" x-transition>
-                        <h3 class="font-bold text-gray-900 border-b pb-2 mb-4" x-text="isEditing ? 'Edit Study Activity' : 'Add Study Activity'"></h3>
-                        <div class="space-y-4">
-                            <div class="flex flex-col gap-2">
-                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Select Date 📅</label>
-                                <input type="date" x-model="newSchedule.date" class="w-full text-sm p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-red-400 outline-none transition-all">
-                            </div>
-                            
-                            <div class="flex flex-col gap-2">
-                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Set Time ⏰</label>
-                                <div class="flex gap-2">
-                                    <input type="number" x-model="timeInputs.hour" placeholder="HH" min="1" max="12" class="w-16 p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-red-400 outline-none text-center">
-                                    <span class="flex items-center font-bold text-gray-300">:</span>
-                                    <input type="number" x-model="timeInputs.minute" placeholder="MM" min="0" max="59" class="w-16 p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-red-400 outline-none text-center">
-                                    <select x-model="timeInputs.ampm" class="p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-red-400 outline-none text-sm font-bold flex-1">
-                                        <option>AM</option>
-                                        <option>PM</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div class="flex flex-col gap-2">
-                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Activity Name 📚</label>
-                                <input type="text" x-model="newSchedule.activity" placeholder="e.g. History Review" class="w-full text-sm p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-red-400 outline-none transition-all font-medium">
-                            </div>
-                            
-                            <button @click="saveSchedule" class="w-full bg-[#8C1007] hover:bg-[#7a0d06] text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-                                <i data-lucide="save" class="w-4 h-4"></i>
-                                Save to Schedule
-                            </button>
+                <div class="p-6 space-y-4">
+                    <!-- Add Activity Form -->
+                    <div x-show="isScheduling" class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200" x-transition>
+                        <h3 class="font-bold text-sm text-gray-900">Add New Activity</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <select x-model="newSchedule.day" class="w-full text-xs p-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                                <option value="">Select Day</option>
+                                <template x-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']">
+                                    <option :value="day" x-text="day"></option>
+                                </template>
+                            </select>
+                            <input type="text" x-model="newSchedule.time" placeholder="e.g. 9:00 AM" class="w-full text-xs p-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
                         </div>
+                        <input type="text" x-model="newSchedule.activity" placeholder="Activity name..." class="w-full text-xs p-2 border rounded-lg focus:ring-2 focus:ring-red-500 outline-none">
+                        <button @click="saveSchedule" class="w-full py-2 bg-red-700 text-white rounded-lg text-xs font-bold hover:bg-red-800 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="save" class="w-3 h-3"></i>
+                            Save to Schedule
+                        </button>
                     </div>
 
-                    <!-- View Phase -->
-                    <div x-show="!isScheduling && !isEditing" x-transition>
+                    <!-- Schedule List -->
+                    <div x-show="!isScheduling" class="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                         <template x-if="scheduleItems.length === 0">
-                            <div class="text-center py-10">
-                                <div class="text-5xl mb-4 grayscale opacity-20">📅</div>
-                                <p class="text-sm text-gray-400 font-medium">Your study schedule is empty.</p>
-                                <button @click="toggleForm()" class="mt-4 text-xs font-bold text-red-700 hover:bg-red-50 px-4 py-2 rounded-full border-2 border-red-50 transition-all">Start Planning</button>
-
+                            <div class="text-center py-8">
+                                <div class="text-4xl mb-2 text-gray-300">📅</div>
+                                <p class="text-sm text-gray-500">No activities scheduled yet.</p>
+                                <button @click="isScheduling = true" class="mt-2 text-xs text-red-700 font-bold hover:underline">Add your first activity</button>
                             </div>
                         </template>
-
-                        <div class="space-y-6">
-                            <template x-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']" :key="day">
-                                <template x-if="scheduleItems.some(i => i.day === day)">
-                                    <div class="mb-4">
-                                        <div class="flex items-center gap-2 mb-3">
-                                            <div class="h-px bg-gray-100 flex-1"></div>
-                                            <div class="font-bold text-[10px] uppercase tracking-widest text-gray-400" x-text="day"></div>
-                                            <div class="h-px bg-gray-100 flex-1"></div>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <template x-for="item in scheduleItems.filter(i => i.day === day)" :key="item.id">
-                                                <div class="flex items-center justify-between p-4 bg-white border-2 border-gray-50 rounded-2xl hover:border-red-100 transition-all group shadow-sm hover:shadow-md">
-                                                    <div class="flex items-center gap-4">
-                                                        <div class="w-1.5 h-10 rounded-full" :style="{ backgroundColor: getDayColor(item.color) }"></div>
-                                                        <div>
-                                                            <div class="font-bold text-sm text-gray-900 group-hover:text-red-700 transition-colors" x-text="item.activity"></div>
-                                                            <div class="text-[11px] text-gray-500 font-medium flex items-center gap-2">
-                                                                <i data-lucide="clock" class="w-3 h-3"></i>
-                                                                <span x-text="item.time"></span>
-                                                                <span x-show="item.date" x-text="' | ' + item.date" class="text-gray-300"></span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <button @click="editSchedule(item)" class="p-2 hover:bg-blue-50 text-gray-300 hover:text-blue-600 rounded-xl">
-                                                            <i data-lucide="edit-2" class="w-4 h-4"></i>
-                                                        </button>
-                                                        <button @click="deleteSchedule(item.id)" class="p-2 hover:bg-red-50 text-gray-300 hover:text-red-600 rounded-xl">
-                                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                        </button>
-                                                    </div>
+                        <template x-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']" :key="day">
+                            <div x-show="scheduleItems.some(i => i.day === day)" class="mb-4">
+                                <div class="font-bold text-[10px] uppercase tracking-wider text-gray-400 mb-2" x-text="day"></div>
+                                <div class="space-y-2">
+                                    <template x-for="item in scheduleItems.filter(i => i.day === day)" :key="item.id">
+                                        <div class="flex items-center justify-between p-3 border-2 border-gray-100 rounded-xl hover:border-red-200 transition-all group/item">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-2 h-8 rounded-full" :style="{ backgroundColor: getDayColor(item.color) }"></div>
+                                                <div>
+                                                    <div class="text-xs font-bold text-gray-900" x-text="item.activity"></div>
+                                                    <div class="text-[10px] text-gray-500" x-text="item.time"></div>
                                                 </div>
-                                            </template>
+                                            </div>
+                                            <button @click="deleteSchedule(item.id)" class="opacity-0 group-hover/item:opacity-100 p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-700 rounded-lg transition-all">
+                                                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                            </button>
                                         </div>
-                                    </div>
-                                </template>
-                            </template>
-                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -430,59 +358,24 @@
                 showSchedule: false,
                 showAlerts: false,
                 isScheduling: false,
-                isEditing: false,
-                editingId: null,
-                toggleForm() {
-                    if (this.isEditing || this.isScheduling) {
-                        // If we are in any form, clicking 'back' takes us to view mode and clears everything
-                        this.isEditing = false;
-                        this.isScheduling = false;
-                        this.editingId = null;
-                        this.newSchedule = { day: 'General', date: '', time: '', activity: '', color: 'blue' };
-                        this.timeInputs = { hour: '09', minute: '00', ampm: 'AM' };
-                    } else {
-                        // If we are in view mode, clicking 'plus' takes us to add mode
-                        this.isScheduling = true;
-                    }
-                    this.$nextTick(() => lucide.createIcons());
-                },
-                getGreeting() {
-                    const hour = new Date().getHours();
-                    if (hour >= 5 && hour < 12) return 'Good morning';
-                    if (hour >= 12 && hour < 18) return 'Good afternoon';
-                    if (hour >= 18 && hour < 22) return 'Good evening';
-                    return 'Good evening'; // Default for late night too
-                },
                 scheduleItems: JSON.parse('{{ schedule_items_json|safe }}'),
-                newSchedule: { day: 'General', date: '', time: '', activity: '', color: 'blue' },
-                timeInputs: { hour: '09', minute: '00', ampm: 'AM' },
+                newSchedule: { day: '', time: '', activity: '', color: 'blue' },
                 stats: [
                     { label: 'Documents', value: '{{ docs_count }}', change: 'Total indexed', icon: 'file-text', emoji: '📄', color: '#8C1007', bgColor: '#FEF2F2' },
                     { label: 'Tasks Done', value: '{{ completed_count }}/{{ total_tasks }}', change: '{{ completion_rate }}% complete', icon: 'check-square', emoji: '✅', color: '#10B981', bgColor: '#D1FAE5' },
                     { label: 'Study Hours', value: '{{ study_hours }}h', change: 'Estimated time', icon: 'clock', emoji: '⏰', color: '#F59E0B', bgColor: '#FEF3C7' },
                     { label: 'Progress', value: '{{ completion_rate }}%', change: 'Keep it up!', icon: 'trending-up', emoji: '📈', color: '#8B5CF6', bgColor: '#EDE9FE' },
                 ],
-                upcomingTasks: JSON.parse('{{ upcoming_tasks_json|escapejs }}'),
-                recentSummaries: JSON.parse('{{ recent_summaries_json|escapejs }}'),
+                upcomingTasks: JSON.parse('{{ upcoming_tasks_json|safe }}'),
                 achievements: [
-                    { title: 'Study Starter', emoji: '🌱', unlocked: Number('{{ completed_count }}') >= 1, progress: Math.min((Number('{{ completed_count }}') / 1) * 100, 100) },
-                    { title: 'Early Bird', emoji: '🐦', unlocked: Number('{{ completed_count }}') >= 10, progress: Math.min((Number('{{ completed_count }}') / 10) * 100, 100) },
-                    { title: 'Task Master', emoji: '🏆', unlocked: Number('{{ completed_count }}') >= 25, progress: Math.min((Number('{{ completed_count }}') / 25) * 100, 100) },
+                    { title: 'Study Starter', emoji: '🌱', unlocked: {{ completed_count }} >= 1, progress: Math.min(({{ completed_count }} / 1) * 100, 100) },
+                    { title: 'Early Bird', emoji: '🐦', unlocked: {{ completed_count }} >= 10, progress: Math.min(({{ completed_count }} / 10) * 100, 100) },
+                    { title: 'Task Master', emoji: '🏆', unlocked: {{ completed_count }} >= 25, progress: Math.min(({{ completed_count }} / 25) * 100, 100) },
                 ],
                 async saveSchedule() {
-                    if (this.newSchedule.date && this.newSchedule.activity) {
+                    if (this.newSchedule.day && this.newSchedule.time && this.newSchedule.activity) {
                         try {
-                            const dateObj = new Date(this.newSchedule.date);
-                            if (isNaN(dateObj.getTime())) {
-                                alert("Please enter a valid date.");
-                                return;
-                            }
-                            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                            this.newSchedule.day = days[dateObj.getDay()];
-                            this.newSchedule.time = `${this.timeInputs.hour}:${this.timeInputs.minute.toString().padStart(2, '0')} ${this.timeInputs.ampm}`;
-
-                            const url = this.isEditing ? `/tasks/schedule/edit/${this.editingId}/` : '/tasks/schedule/add/';
-                            const response = await fetch(url, {
+                            const response = await fetch('/tasks/schedule/add/', {
                                 method: 'POST',
                                 headers: {
                                     'X-CSRFToken': '{{ csrf_token }}',
@@ -490,44 +383,17 @@
                                 },
                                 body: JSON.stringify(this.newSchedule)
                             });
-                            
                             const data = await response.json();
                             if (data.status === 'success') {
-                                if (this.isEditing) {
-                                    this.scheduleItems = this.scheduleItems.map(i => i.id === this.editingId ? data.item : i);
-                                } else {
-                                    this.scheduleItems = [...this.scheduleItems, data.item];
-                                }
-                                
-                                // Success state reset
-                                this.newSchedule = { day: 'General', date: '', time: '', activity: '', color: 'blue' };
+                                this.scheduleItems.push(data.item);
+                                this.newSchedule = { day: '', time: '', activity: '', color: 'blue' };
                                 this.isScheduling = false;
-                                this.isEditing = false;
-                                this.editingId = null;
-                                
-                                // Force UI Refresh
-                                this.$nextTick(() => {
-                                    if(window.lucide) lucide.createIcons();
-                                });
-                            } else {
-                                alert("Save Failed: " + (data.message || "Unknown error"));
+                                this.$nextTick(() => lucide.createIcons());
                             }
                         } catch (error) {
-                            console.error('CRITICAL: Schedule Save Error:', error);
-                            alert("Connection Error. Please check your network.");
+                            console.error('Error saving schedule:', error);
                         }
-                    } else {
-                        alert("Please fill in both Date and Activity Name!");
                     }
-                },
-                editSchedule(item) {
-                    this.isEditing = true;
-                    this.editingId = item.id;
-                    this.newSchedule = { ...item };
-                    const [fullTime, ampm] = item.time.split(' ');
-                    const [hour, minute] = fullTime.split(':');
-                    this.timeInputs = { hour: parseInt(hour), minute: parseInt(minute), ampm };
-                    this.$nextTick(() => lucide.createIcons());
                 },
                 async deleteSchedule(id) {
                     try {

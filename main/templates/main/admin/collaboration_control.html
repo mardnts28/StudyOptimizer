@@ -1,0 +1,456 @@
+{% extends "main/admin/admin_base.html" %}
+{% block title %}Collaboration Control — StudyOptimizer Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+  .page-title { font-size:26px; font-weight:700; color:#1A1A1A; margin-bottom:4px; }
+  .page-sub   { font-size:14px; color:#6B7280; margin-bottom:28px; }
+
+  .stats-row  { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; }
+  .stat-card  { background:#fff; border-radius:14px; border:1px solid #F0E4E4; padding:22px 24px; display:flex; align-items:center; gap:18px; }
+  .stat-icon  { width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#7B1818,#9B2020); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .stat-icon i { color:#fff; font-size:20px; }
+  .stat-num  { font-size:28px; font-weight:700; color:#1A1A1A; line-height:1; }
+  .stat-lbl  { font-size:13px; color:#6B7280; margin-top:3px; }
+
+  .section-title { font-size:15px; font-weight:700; color:#7B1818; margin-bottom:16px; }
+
+  .feed-card  { background:#fff; border-radius:14px; border:1px solid #F0E4E4; overflow:hidden; margin-bottom:24px; }
+  .post-item  { padding:22px 24px; border-bottom:1px solid #F7EDED; transition: opacity 0.3s, background 0.3s; }
+  .post-item:last-child { border-bottom:none; }
+  .post-item.hidden-post { opacity: 0.5; background: #FAFAFA; }
+
+  .post-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; }
+  .post-meta   { display:flex; align-items:center; gap:12px; }
+  .avatar      { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#7B1818,#9B2020); display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px; font-weight:700; flex-shrink:0; }
+  .poster-name { font-size:14px; font-weight:600; color:#1A1A1A; }
+  .post-time   { font-size:12px; color:#9CA3AF; margin-top:2px; }
+
+  .post-right  { display:flex; align-items:center; gap:10px; }
+  .subject-tag { padding:3px 12px; border-radius:20px; font-size:12px; font-weight:600; }
+  .tag-math    { background:#FEF3C7; color:#92400E; }
+  .tag-physics { background:#FEE2E2; color:#991B1B; }
+  .tag-english { background:#EDE9FE; color:#6D28D9; }
+  .tag-science { background:#D1FAE5; color:#065F46; }
+  .tag-default { background:#F3F4F6; color:#374151; }
+
+  .menu-wrap   { position:relative; }
+  .menu-btn    { background:none; border:none; cursor:pointer; color:#9CA3AF; font-size:16px; padding:4px 6px; border-radius:6px; transition: background 0.15s, color 0.15s; }
+  .menu-btn:hover { color:#7B1818; background:#FDF0F0; }
+  .menu-btn.active { color:#7B1818; background:#FDF0F0; }
+
+  .dropdown    { display:none; position:absolute; right:0; top:calc(100% + 6px); background:#fff; border:1px solid #F0E4E4; border-radius:12px; min-width:165px; box-shadow:0 8px 24px rgba(0,0,0,0.10); z-index:999; overflow:hidden; animation: dropIn 0.15s ease; }
+  .dropdown.open { display:block; }
+
+  @keyframes dropIn {
+    from { opacity:0; transform:translateY(-6px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .dropdown-item { display:flex; align-items:center; gap:10px; padding:11px 16px; font-size:13px; font-weight:500; cursor:pointer; border:none; background:none; width:100%; text-align:left; transition: background 0.12s; }
+  .dropdown-item:hover { background:#FDF6F6; }
+  .dropdown-item.hide-action   { color:#374151; }
+  .dropdown-item.delete-action { color:#DC2626; }
+  .dropdown-item i { font-size:13px; width:16px; }
+  .dropdown-item:disabled { opacity:0.5; cursor:not-allowed; pointer-events:none; }
+
+  .post-title  { font-size:15px; font-weight:600; color:#1A1A1A; margin-bottom:6px; }
+  .post-body   { font-size:13px; color:#6B7280; margin-bottom:14px; line-height:1.5; }
+
+  .post-stats  { display:flex; align-items:center; gap:20px; }
+  .post-stat   { display:flex; align-items:center; gap:6px; font-size:13px; color:#6B7280; }
+  .post-stat i { font-size:13px; }
+
+  .hidden-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:#F3F4F6; color:#6B7280; margin-left:8px; }
+
+  /* ── Toast ─────────────────────────────────────────────────────────────── */
+  #toast {
+    position:fixed; bottom:28px; right:28px;
+    background:#1A1A1A; color:#fff;
+    padding:13px 18px; border-radius:12px;
+    font-size:13px; font-weight:500;
+    opacity:0; pointer-events:none;
+    transition:opacity 0.25s, transform 0.25s;
+    transform: translateY(8px);
+    z-index:9999; display:flex; align-items:flex-start; gap:10px;
+    max-width:340px; line-height:1.45;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  #toast.show { opacity:1; transform:translateY(0); }
+  #toast .toast-icon { font-size:15px; margin-top:1px; flex-shrink:0; }
+  #toast.success .toast-icon { color:#34D399; }
+  #toast.warning .toast-icon { color:#FBBF24; }
+  #toast.error   .toast-icon { color:#F87171; }
+  #toast .toast-body {}
+  #toast .toast-title { font-weight:700; margin-bottom:2px; }
+  #toast .toast-sub   { font-size:12px; color:#D1D5DB; }
+
+  /* ── Delete confirm modal ──────────────────────────────────────────────── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:10000; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:#fff; border-radius:16px; padding:28px 28px 24px; max-width:400px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.15); animation: modalIn 0.2s ease; }
+  @keyframes modalIn {
+    from { opacity:0; transform:scale(0.94); }
+    to   { opacity:1; transform:scale(1); }
+  }
+  .modal-icon { width:48px; height:48px; border-radius:50%; background:#FEE2E2; display:flex; align-items:center; justify-content:center; margin-bottom:16px; }
+  .modal-icon i { color:#DC2626; font-size:20px; }
+  .modal-title { font-size:16px; font-weight:700; color:#1A1A1A; margin-bottom:6px; }
+  .modal-desc  { font-size:13px; color:#6B7280; margin-bottom:6px; line-height:1.5; }
+  .modal-notice { font-size:12px; color:#9CA3AF; margin-bottom:22px; display:flex; align-items:flex-start; gap:6px; background:#FDF6F6; border-radius:8px; padding:10px 12px; border:1px solid #F0E4E4; }
+  .modal-notice i { color:#7B1818; margin-top:1px; flex-shrink:0; }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+  .btn-cancel  { padding:9px 18px; border-radius:9px; border:1px solid #E5E7EB; background:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; color:#374151; }
+  .btn-cancel:hover { background:#F9FAFB; }
+  .btn-confirm-del { padding:9px 18px; border-radius:9px; border:none; background:#DC2626; color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-confirm-del:hover { background:#B91C1C; }
+
+  /* ── Tags ──────────────────────────────────────────────────────────────── */
+  .tags-card   { background:#fff; border-radius:14px; border:1px solid #F0E4E4; padding:22px 24px; }
+  .tags-input-row { display:flex; gap:10px; margin-bottom:16px; }
+  .tags-input  { flex:1; padding:10px 14px; border:1px solid #E5E7EB; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; outline:none; }
+  .tags-input:focus { border-color:#7B1818; }
+  .btn-add     { background:#7B1818; color:#fff; border:none; border-radius:10px; padding:10px 20px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .btn-add:hover { background:#5C1010; }
+  .tags-list   { display:flex; flex-wrap:wrap; gap:8px; }
+  .tag-pill    { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; border:1px solid #E8C4C4; background:#FDF6F6; font-size:13px; color:#7B1818; font-weight:500; }
+  .tag-pill button { background:none; border:none; cursor:pointer; color:#9CA3AF; font-size:12px; line-height:1; }
+  .tag-pill button:hover { color:#7B1818; }
+
+  /* ── Loading spinner on buttons ───────────────────────────────────────── */
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .fa-spin-custom { animation: spin 0.7s linear infinite; display:inline-block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-title">Collaboration Control</div>
+<div class="page-sub">Moderate community feed and manage content</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-comment-dots"></i></div>
+    <div><div class="stat-num" id="stat-active">{{ active_posts|default:"0" }}</div><div class="stat-lbl">Active Posts</div></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-heart"></i></div>
+    <div><div class="stat-num">{{ total_interactions|default:"0" }}</div><div class="stat-lbl">Total Interactions</div></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-eye"></i></div>
+    <div><div class="stat-num">{{ total_views|default:"0" }}</div><div class="stat-lbl">Total Views</div></div>
+  </div>
+</div>
+
+<!-- COMMUNITY FEED -->
+<div class="section-title">Community Feed</div>
+<div class="feed-card">
+  {% for m in material_list %}
+  <div class="post-item {% if m.is_hidden %}hidden-post{% endif %}" id="post-{{ m.id }}">
+    <div class="post-header">
+      <div class="post-meta">
+        <div class="avatar">{{ m.initials }}</div>
+        <div>
+          <div class="poster-name">
+            {{ m.author_name }}
+            {% if m.is_hidden %}<span class="hidden-badge"><i class="fas fa-eye-slash"></i> Hidden</span>{% endif %}
+          </div>
+          <div class="post-time">{{ m.time_ago }}</div>
+        </div>
+      </div>
+      <div class="post-right">
+        <span class="subject-tag
+          {% if m.subject == 'Mathematics' %}tag-math
+          {% elif m.subject == 'Physics' %}tag-physics
+          {% elif m.subject == 'English' %}tag-english
+          {% elif m.subject == 'Science' %}tag-science
+          {% else %}tag-default{% endif %}">
+          {{ m.subject }}
+        </span>
+        <div class="menu-wrap">
+          <button class="menu-btn" onclick="toggleMenu(event, 'menu-{{ m.id }}')">
+            <i class="fas fa-ellipsis-vertical"></i>
+          </button>
+          <div class="dropdown" id="menu-{{ m.id }}">
+            <button class="dropdown-item hide-action" id="hide-btn-{{ m.id }}"
+                    onclick="toggleHide({{ m.id }}, this)">
+              <i class="fas {% if m.is_hidden %}fa-eye{% else %}fa-eye-slash{% endif %}"></i>
+              {% if m.is_hidden %}Unhide Post{% else %}Hide Post{% endif %}
+            </button>
+            <button class="dropdown-item delete-action"
+                    onclick="confirmDelete({{ m.id }}, '{{ m.title|escapejs }}', '{{ m.author_name|escapejs }}')">
+              <i class="fas fa-trash-can"></i> Delete Post
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="post-title">{{ m.title }}</div>
+    <div class="post-body">{{ m.content }}</div>
+    <div class="post-stats">
+      <span class="post-stat"><i class="fas fa-heart"></i> {{ m.likes }} likes</span>
+      <span class="post-stat"><i class="fas fa-comment"></i> {{ m.comments }} comments</span>
+      <span class="post-stat"><i class="fas fa-eye"></i> {{ m.views }} views</span>
+    </div>
+  </div>
+  {% empty %}
+  <div style="padding:40px 24px; text-align:center; color:#9CA3AF; font-size:14px;">
+    <i class="fas fa-inbox" style="font-size:28px; margin-bottom:10px; display:block;"></i>
+    No posts yet.
+  </div>
+  {% endfor %}
+</div>
+
+<!-- SUBJECT TAGS -->
+<div class="section-title">Subject Tags</div>
+<div class="tags-card">
+  <div class="tags-input-row">
+    <input class="tags-input" id="newTag" type="text" placeholder="Add new subject..."
+           onkeydown="if(event.key==='Enter') addTag()">
+    <button class="btn-add" onclick="addTag()"><i class="fas fa-tag"></i> Add</button>
+  </div>
+  <div class="tags-list" id="tagsList">
+    {% for topic in trending_topics %}
+    <div class="tag-pill">{{ topic }} <button onclick="this.parentElement.remove()">✕</button></div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box">
+    <div class="modal-icon"><i class="fas fa-trash-can"></i></div>
+    <div class="modal-title">Delete this post?</div>
+    <div class="modal-desc" id="modal-desc">
+      This will permanently remove the post from the community feed.
+    </div>
+    <div class="modal-notice">
+      <i class="fas fa-bell"></i>
+      <span>The author will be notified that their post was removed for violating community guidelines.</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm-del" id="confirmDelBtn" onclick="executeDelete()">
+        <i class="fas fa-trash-can"></i> Yes, Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">
+  <i class="toast-icon fas fa-circle-check"></i>
+  <div class="toast-body">
+    <div class="toast-title" id="toast-title"></div>
+    <div class="toast-sub"  id="toast-sub"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // ── CSRF ────────────────────────────────────────────────────────────────
+  const CSRF = () => document.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? '';
+
+  // ── Active-post counter ─────────────────────────────────────────────────
+  let activeCount = parseInt(document.getElementById('stat-active').textContent, 10) || 0;
+
+  // ── Dropdown toggle ─────────────────────────────────────────────────────
+  function toggleMenu(e, menuId) {
+    e.stopPropagation();
+    const dropdown = document.getElementById(menuId);
+    const btn = e.currentTarget;
+    const isOpen = dropdown.classList.contains('open');
+    closeAllMenus();
+    if (!isOpen) {
+      dropdown.classList.add('open');
+      btn.classList.add('active');
+    }
+  }
+
+  function closeAllMenus() {
+    document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+    document.querySelectorAll('.menu-btn.active').forEach(b => b.classList.remove('active'));
+  }
+
+  document.addEventListener('click', closeAllMenus);
+
+  // ── Hide / Unhide ────────────────────────────────────────────────────────
+  async function toggleHide(postId, btn) {
+    closeAllMenus();
+
+    const postEl  = document.getElementById(`post-${postId}`);
+    const isHidden = postEl.classList.contains('hidden-post');
+    const action  = isHidden ? 'unhide' : 'hide';
+
+    // Optimistic UI — disable button while in-flight
+    btn.disabled = true;
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin-custom"></i> Working…';
+
+    try {
+      const res = await fetch(`/admin-panel/posts/${postId}/hide/`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF() },
+        body:    JSON.stringify({ action }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (action === 'hide') {
+        postEl.classList.add('hidden-post');
+        const nameEl = postEl.querySelector('.poster-name');
+        if (!nameEl.querySelector('.hidden-badge')) {
+          nameEl.insertAdjacentHTML('beforeend',
+            '<span class="hidden-badge"><i class="fas fa-eye-slash"></i> Hidden</span>');
+        }
+        btn.innerHTML = '<i class="fas fa-eye"></i> Unhide Post';
+        activeCount   = Math.max(0, activeCount - 1);
+        document.getElementById('stat-active').textContent = activeCount;
+        showToast(
+          'Post hidden',
+          'Author notified — post violates community guidelines.',
+          'warning'
+        );
+      } else {
+        postEl.classList.remove('hidden-post');
+        postEl.querySelector('.hidden-badge')?.remove();
+        btn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide Post';
+        activeCount  += 1;
+        document.getElementById('stat-active').textContent = activeCount;
+        showToast(
+          'Post restored',
+          'Author notified — post is visible again.',
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      btn.innerHTML = origHTML;   // roll back
+      showToast('Action failed', 'Please try again.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Delete modal ─────────────────────────────────────────────────────────
+  let pendingDeleteId = null;
+
+  function confirmDelete(postId, title, author) {
+    closeAllMenus();
+    pendingDeleteId = postId;
+    document.getElementById('modal-desc').textContent =
+      `"${title}" by ${author} will be permanently removed for all users.`;
+    document.getElementById('deleteModal').classList.add('open');
+  }
+
+  function closeModal() {
+    pendingDeleteId = null;
+    document.getElementById('deleteModal').classList.remove('open');
+  }
+
+  // Close modal on backdrop click
+  document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  async function executeDelete() {
+    if (!pendingDeleteId) return;
+    const postId = pendingDeleteId;
+
+    const confirmBtn = document.getElementById('confirmDelBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin-custom"></i> Deleting…';
+
+    closeModal();
+
+    try {
+      const res = await fetch(`/admin-panel/posts/${postId}/delete/`, {
+        method:  'DELETE',
+        headers: { 'X-CSRFToken': CSRF() },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Animate removal
+      const postEl = document.getElementById(`post-${postId}`);
+      const wasVisible = !postEl.classList.contains('hidden-post');
+      postEl.style.transition = 'opacity 0.3s, max-height 0.4s, padding 0.3s, margin 0.3s';
+      postEl.style.opacity    = '0';
+      postEl.style.maxHeight  = postEl.offsetHeight + 'px';
+      requestAnimationFrame(() => {
+        postEl.style.maxHeight = '0';
+        postEl.style.padding   = '0';
+        postEl.style.margin    = '0';
+        postEl.style.overflow  = 'hidden';
+      });
+      setTimeout(() => postEl.remove(), 420);
+
+      if (wasVisible) {
+        activeCount = Math.max(0, activeCount - 1);
+        document.getElementById('stat-active').textContent = activeCount;
+      }
+
+      showToast(
+        'Post deleted',
+        'Author notified — content removed for community guideline violation.',
+        'success'
+      );
+    } catch (err) {
+      console.error(err);
+      showToast('Delete failed', 'Please try again.', 'error');
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = '<i class="fas fa-trash-can"></i> Yes, Delete';
+    }
+  }
+
+  // ── Toast ────────────────────────────────────────────────────────────────
+  let toastTimer;
+
+  function showToast(title, sub = '', type = 'success') {
+    const toast  = document.getElementById('toast');
+    const icon   = toast.querySelector('.toast-icon');
+
+    document.getElementById('toast-title').textContent = title;
+    document.getElementById('toast-sub').textContent   = sub;
+
+    const iconMap = {
+      success: 'fas fa-circle-check',
+      warning: 'fas fa-triangle-exclamation',
+      error:   'fas fa-circle-xmark',
+    };
+    icon.className = `toast-icon ${iconMap[type] || iconMap.success}`;
+    toast.className = `${type} show`;
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+  }
+
+  // ── Add tag ──────────────────────────────────────────────────────────────
+  async function addTag() {
+    const input = document.getElementById('newTag');
+    const val   = input.value.trim();
+    if (!val) return;
+
+    const res = await fetch('/admin/tags/add/', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF() },
+      body:    JSON.stringify({ name: val }),
+    });
+
+    if (res.ok) {
+      const pill = document.createElement('div');
+      pill.className = 'tag-pill';
+      pill.innerHTML = `${val} <button onclick="this.parentElement.remove()">✕</button>`;
+      document.getElementById('tagsList').appendChild(pill);
+      input.value = '';
+      input.focus();
+    } else {
+      showToast('Could not add tag', 'Please try again.', 'error');
+    }
+  }
+</script>
+{% endblock %}

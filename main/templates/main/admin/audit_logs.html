@@ -1,0 +1,188 @@
+{% extends "main/admin/admin_base.html" %}
+{% block title %}Audit Logs — StudyOptimizer Admin{% endblock %}
+
+{% block extra_head %}
+<style>
+  .page-title { font-size:26px; font-weight:700; color:#1A1A1A; margin-bottom:4px; }
+  .page-sub   { font-size:14px; color:#6B7280; margin-bottom:28px; }
+
+  .stats-row  { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; }
+  .stat-card  { background:#fff; border-radius:14px; border:1px solid #F0E4E4; padding:22px 24px; display:flex; align-items:center; gap:18px; }
+  .stat-icon  { width:48px; height:48px; border-radius:12px; background:linear-gradient(135deg,#7B1818,#9B2020); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .stat-icon i { color:#fff; font-size:20px; }
+  .stat-num  { font-size:26px; font-weight:700; color:#1A1A1A; line-height:1; }
+  .stat-lbl  { font-size:13px; color:#6B7280; margin-top:3px; }
+
+  /* Tabs */
+  .tabs      { display:flex; gap:0; margin-bottom:24px; }
+  .tab-btn   { padding:9px 20px; border-radius:20px; border:none; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; background:none; color:#6B7280; transition:all .15s; }
+  .tab-btn.active { background:#7B1818; color:#fff; }
+  .tab-btn:hover:not(.active) { background:#F9F1F1; color:#7B1818; }
+
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  .section-title { font-size:15px; font-weight:700; color:#7B1818; margin-bottom:16px; }
+
+  .logs-card  { background:#fff; border-radius:14px; border:1px solid #F0E4E4; overflow:hidden; }
+  .log-row    { display:flex; align-items:flex-start; gap:14px; padding:18px 20px; border-bottom:1px solid #F7EDED; }
+  .log-row:last-child { border-bottom:none; }
+  .empty-state { padding:40px 20px; text-align:center; color:#9CA3AF; font-size:14px; }
+
+  .log-icon   { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+  .log-icon.green  { background:#DCFCE7; color:#16A34A; }
+  .log-icon.yellow { background:#FEF9C3; color:#CA8A04; }
+  .log-icon.blue   { background:#DBEAFE; color:#2563EB; }
+  .log-icon.red    { background:#FEE2E2; color:#DC2626; }
+
+  .log-title  { font-size:14px; font-weight:600; color:#1A1A1A; }
+  .log-by     { font-size:12px; color:#6B7280; margin-top:3px; }
+  .log-meta   { font-size:11px; color:#9CA3AF; margin-top:3px; }
+
+  .badge-success { background:#DCFCE7; color:#16A34A; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:auto; flex-shrink:0; align-self:center; }
+  .badge-warning { background:#FEF9C3; color:#CA8A04; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:auto; flex-shrink:0; align-self:center; }
+  .badge-info    { background:#DBEAFE; color:#2563EB; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:auto; flex-shrink:0; align-self:center; }
+  .badge-error   { background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; margin-left:auto; flex-shrink:0; align-self:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-title">Feedback &amp; Audit Logs</div>
+<div class="page-sub">System security, monitoring, and user feedback</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-shield-halved"></i></div>
+    <div>
+      <div class="stat-num">{{ security_events }}</div>
+      <div class="stat-lbl">Security Events Today</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-triangle-exclamation"></i></div>
+    <div>
+      <div class="stat-num">{{ warnings_today }}</div>
+      <div class="stat-lbl">Warnings Today</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-star"></i></div>
+    <div>
+      <div class="stat-num">{{ avg_rating }}</div>
+      <div class="stat-lbl">Average User Rating</div>
+    </div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('security', this)">Security Logs</button>
+  <button class="tab-btn" onclick="switchTab('system', this)">System Logs</button>
+  <button class="tab-btn" onclick="switchTab('feedback', this)">
+    User Feedback
+    {% if feedback_list %}
+      <span style="background:#7B1818;color:#fff;border-radius:20px;padding:1px 7px;font-size:11px;margin-left:6px;">
+        {{ feedback_list|length }}
+      </span>
+    {% endif %}
+  </button>
+</div>
+
+<!-- SECURITY LOGS TAB -->
+<div class="tab-panel active" id="tab-security">
+  <div class="section-title">Security &amp; Admin Activity Logs</div>
+  <div class="logs-card">
+    {% for log in security_logs %}
+    <div class="log-row">
+      <div class="log-icon {{ log.icon_class }}">
+        <i class="fas fa-{{ log.icon_fa }}"></i>
+      </div>
+      <div>
+        <div class="log-title">{{ log.title }}</div>
+        <div class="log-by">By: {{ log.performed_by }}</div>
+        <div class="log-meta">
+          {{ log.created_at|date:"Y-m-d H:i:s" }}
+          {% if log.ip_address %}&nbsp;•&nbsp; IP: {{ log.ip_address }}{% endif %}
+          {% if log.source %}&nbsp;•&nbsp; {{ log.source }}{% endif %}
+        </div>
+      </div>
+      <span class="{{ log.badge_class }}">{{ log.severity }}</span>
+    </div>
+    {% empty %}
+    <div class="empty-state">
+      <i class="fas fa-shield-halved" style="font-size:28px;margin-bottom:8px;display:block;opacity:.3;"></i>
+      No security events recorded today.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- SYSTEM LOGS TAB -->
+<div class="tab-panel" id="tab-system">
+  <div class="section-title">System Activity Logs</div>
+  <div class="logs-card">
+    {% for log in system_logs %}
+    <div class="log-row">
+      <div class="log-icon {{ log.icon_class }}">
+        <i class="fas fa-{{ log.icon_fa }}"></i>
+      </div>
+      <div>
+        <div class="log-title">{{ log.title }}</div>
+        <div class="log-by">{{ log.performed_by }}</div>
+        <div class="log-meta">
+          {{ log.created_at|date:"Y-m-d H:i:s" }}
+          {% if log.ip_address %}&nbsp;•&nbsp; IP: {{ log.ip_address }}{% endif %}
+          {% if log.source %}&nbsp;•&nbsp; {{ log.source }}{% endif %}
+        </div>
+      </div>
+      <span class="{{ log.badge_class }}">{{ log.severity }}</span>
+    </div>
+    {% empty %}
+    <div class="empty-state">
+      <i class="fas fa-server" style="font-size:28px;margin-bottom:8px;display:block;opacity:.3;"></i>
+      No system events recorded.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- USER FEEDBACK TAB -->
+<div class="tab-panel" id="tab-feedback">
+  <div class="section-title">User Feedback &amp; Ratings</div>
+  <div class="logs-card">
+    {% for fb in feedback_list %}
+    <div class="log-row">
+      <div class="log-icon {{ fb.icon_class }}">
+        <i class="fas fa-star"></i>
+      </div>
+      <div>
+        <div class="log-title">
+          {{ fb.star_display }}
+          {% if fb.comment %}&nbsp; "{{ fb.comment }}"{% endif %}
+        </div>
+        <div class="log-by">By: {{ fb.display_name }}</div>
+        <div class="log-meta">{{ fb.created_at|date:"Y-m-d H:i:s" }}</div>
+      </div>
+      <span class="{{ fb.badge_class }}">{{ fb.rating }} star{{ fb.rating|pluralize }}</span>
+    </div>
+    {% empty %}
+    <div class="empty-state">
+      <i class="fas fa-star" style="font-size:28px;margin-bottom:8px;display:block;opacity:.3;"></i>
+      No feedback submitted yet.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+{% endblock %}

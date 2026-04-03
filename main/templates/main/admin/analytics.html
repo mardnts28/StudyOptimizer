@@ -1,0 +1,258 @@
+{% extends "main/admin/admin_base.html" %}
+{% block title %}Analytics — StudyOptimizer Admin{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  .page-title { font-size:24px; font-weight:700; color:#1A1A1A; margin-bottom:4px; }
+  .page-sub   { font-size:13px; color:#6B7280; margin-bottom:24px; }
+
+  /* ── Stat cards ── */
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
+  .stat-card { background:#fff; border-radius:12px; border:1px solid #F0E4E4;
+               padding:18px 22px; display:flex; align-items:center; gap:16px; }
+  .stat-icon { width:46px; height:46px; border-radius:11px; flex-shrink:0;
+               background:linear-gradient(135deg,#7B1818,#9B2020);
+               display:flex; align-items:center; justify-content:center; }
+  .stat-icon i { color:#fff; font-size:18px; }
+  .stat-num  { font-size:clamp(15px, 1.6vw, 24px); font-weight:700; color:#1A1A1A; line-height:1; }
+  .stat-lbl  { font-size:12px; color:#6B7280; margin-top:4px; }
+
+  /* ── Chart layout ── */
+  .section-title { font-size:13px; font-weight:700; color:#7B1818; margin-bottom:14px; }
+  .charts-2col   { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
+  .chart-card    { background:#fff; border-radius:14px; border:1px solid #F0E4E4; padding:22px 24px; }
+
+  /* ── Subject legend ── */
+  .legend-list { margin-top:14px; display:flex; flex-direction:column; gap:7px; }
+  .legend-item { display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#374151; }
+  .legend-dot  { width:9px; height:9px; border-radius:50%; margin-right:8px; flex-shrink:0; }
+  .legend-left { display:flex; align-items:center; }
+  .legend-right { color:#6B7280; }
+
+  /* ── Empty state ── */
+  .empty-msg { font-size:13px; color:#9CA3AF; text-align:center; padding:32px 0; display:none; }
+
+  /* ── Canvas wrappers ── */
+  .canvas-wrap        { position:relative; }
+  .canvas-wrap.h-sm   { height:230px; }   /* two-column (bar + pie) */
+  .canvas-wrap.h-md   { height:200px; }   /* full-width (heatmap + weekly) */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-title">Global Task Analytics</div>
+<div class="page-sub">Understanding student behavior and productivity patterns</div>
+
+<!-- STAT CARDS -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+    <div>
+      <div class="stat-num">{{ total_tasks_week|default:"0" }}</div>
+      <div class="stat-lbl">Total Tasks This Week</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-clock"></i></div>
+    <div>
+      <div class="stat-num">{{ peak_productivity|default:"N/A" }}</div>
+      <div class="stat-lbl">Peak Productivity</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i class="fas fa-calendar-days"></i></div>
+    <div>
+      <div class="stat-num">{{ most_productive_day|default:"N/A" }}</div>
+      <div class="stat-lbl">Most Productive Day</div>
+    </div>
+  </div>
+</div>
+
+<!-- SUBJECTS -->
+<div class="charts-2col">
+  <div class="chart-card">
+    <div class="section-title">Popular Subjects</div>
+    <div class="canvas-wrap h-sm">
+      <canvas id="subjectsBar"></canvas>
+    </div>
+    <div class="legend-list" id="subjectLegend"></div>
+    <div class="empty-msg" id="barEmpty">No subject data yet.</div>
+  </div>
+  <div class="chart-card">
+    <div class="section-title">Subject Distribution</div>
+    <div class="canvas-wrap h-sm">
+      <canvas id="subjectsPie"></canvas>
+    </div>
+    <div class="empty-msg" id="pieEmpty">No subject data yet.</div>
+  </div>
+</div>
+
+<!-- HEATMAP -->
+<div class="chart-card" style="margin-bottom:18px;">
+  <div class="section-title">Completion Heatmap — Peak Productivity Times</div>
+  <div class="canvas-wrap h-md">
+    <canvas id="heatmapChart"></canvas>
+  </div>
+  <div class="empty-msg" id="heatEmpty">No activity recorded yet.</div>
+</div>
+
+<!-- WEEKLY TRENDS -->
+<div class="chart-card">
+  <div class="section-title">Weekly Task Trends</div>
+  <div class="canvas-wrap h-md">
+    <canvas id="weeklyTrends"></canvas>
+  </div>
+  <div class="empty-msg" id="weeklyEmpty">No tasks recorded this week.</div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* ── Data from Django view (PostgreSQL — no hardcoding) ── */
+const labels        = {{ subject_labels_json|default:"[]"|safe }};
+const counts        = {{ subject_counts_json|default:"[]"|safe }};
+const heatMatrix    = {{ heatmap_json|default:"[[],[],[],[],[],[],[]]"|safe }};
+const weekDayLabels = {{ weekly_day_labels_json|default:'["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]'|safe }};
+const weekCompleted = {{ weekly_completed_json|default:"[0,0,0,0,0,0,0]"|safe }};
+const weekAssigned  = {{ weekly_assigned_json|default:"[0,0,0,0,0,0,0]"|safe }};
+
+const maroon = '#7B1818';
+const shades = ['#3D0C0C','#5C1010','#7B1818','#9B2020','#BB4040','#D97070','#F0B0B0'];
+
+const base = {
+  animation: { duration: 600, easing: 'easeOutQuart' },
+  responsive: true,
+  maintainAspectRatio: false,
+};
+
+const tickStyle  = { color: '#9CA3AF', font: { size: 11 } };
+const gridStyle  = { color: '#F3E8E8' };
+const legendOpts = (pos = 'bottom') => ({
+  position: pos,
+  labels: { font: { size: 11 }, color: '#374151', boxWidth: 10, padding: 14 },
+});
+
+function allZero(arr) { return !arr || arr.length === 0 || arr.every(v => v === 0); }
+function hide(cId, eId) {
+  document.getElementById(cId).style.display = 'none';
+  document.getElementById(eId).style.display = 'block';
+}
+
+/* ── 1. Bar – Popular Subjects ── */
+if (allZero(counts)) {
+  hide('subjectsBar', 'barEmpty');
+} else {
+  new Chart(document.getElementById('subjectsBar'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: counts,
+        backgroundColor: labels.map((_, i) => shades[i % shades.length]),
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      ...base,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: tickStyle },
+        y: { beginAtZero: true, grid: gridStyle, ticks: { ...tickStyle, precision: 0 } }
+      }
+    }
+  });
+
+  const total    = counts.reduce((a, b) => a + b, 0);
+  const legendEl = document.getElementById('subjectLegend');
+  labels.forEach((lbl, i) => {
+    const pct = total ? Math.round(counts[i] / total * 100) : 0;
+    legendEl.innerHTML += `
+      <div class="legend-item">
+        <div class="legend-left">
+          <div class="legend-dot" style="background:${shades[i % shades.length]}"></div>${lbl}
+        </div>
+        <div class="legend-right">${counts[i]} tasks (${pct}%)</div>
+      </div>`;
+  });
+}
+
+/* ── 2. Pie – Subject Distribution ── */
+if (allZero(counts)) {
+  hide('subjectsPie', 'pieEmpty');
+} else {
+  new Chart(document.getElementById('subjectsPie'), {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: counts,
+        backgroundColor: shades,
+        borderWidth: 3,
+        borderColor: '#fff',
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      ...base,
+      plugins: { legend: legendOpts('right') }
+    }
+  });
+}
+
+/* ── 3. Heatmap ── */
+const timeBuckets = ['6 AM','9 AM','12 PM','3 PM','6 PM','9 PM','12 AM'];
+const dayNames    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+if (allZero(heatMatrix.flat())) {
+  hide('heatmapChart', 'heatEmpty');
+} else {
+  new Chart(document.getElementById('heatmapChart'), {
+    type: 'bar',
+    data: {
+      labels: timeBuckets,
+      datasets: dayNames.map((day, i) => ({
+        label: day,
+        data: heatMatrix[i] || new Array(timeBuckets.length).fill(0),
+        backgroundColor: shades[i % shades.length],
+        stack: 'stack',
+        borderRadius: 3,
+      }))
+    },
+    options: {
+      ...base,
+      plugins: { legend: legendOpts('bottom') },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: tickStyle },
+        y: { stacked: true, beginAtZero: true, grid: gridStyle, ticks: { ...tickStyle, precision: 0 } }
+      }
+    }
+  });
+}
+
+/* ── 4. Weekly Trends ── */
+if (allZero(weekAssigned) && allZero(weekCompleted)) {
+  hide('weeklyTrends', 'weeklyEmpty');
+} else {
+  new Chart(document.getElementById('weeklyTrends'), {
+    type: 'bar',
+    data: {
+      labels: weekDayLabels,
+      datasets: [
+        { label: 'Completed', data: weekCompleted, backgroundColor: maroon,                  borderRadius: 4, borderSkipped: false },
+        { label: 'Assigned',  data: weekAssigned,  backgroundColor: 'rgba(123,24,24,0.18)', borderRadius: 4, borderSkipped: false }
+      ]
+    },
+    options: {
+      ...base,
+      plugins: { legend: legendOpts('bottom') },
+      scales: {
+        x: { grid: { display: false }, ticks: tickStyle },
+        y: { beginAtZero: true, grid: gridStyle, ticks: { ...tickStyle, precision: 0 } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}
