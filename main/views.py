@@ -222,7 +222,7 @@ def setup_totp(request):
             user.backend = 'django.contrib.auth.backends.ModelBackend'
             login(request, user)
             del request.session['mfa_user_id']
-            return redirect('dashboard')
+            return redirect('admin_dashboard' if is_admin(user) else 'dashboard')
         messages.error(request, 'Invalid code. Please try scanning again.')
 
     return render(request, 'main/setup_totp.html', {'qr_code': svg_data, 'secret': secret})
@@ -271,7 +271,7 @@ def mfa_verify(request):
                 login(request, user)
                 for k in ('mfa_user_id', 'mfa_otp', 'mfa_method'):
                     request.session.pop(k, None)
-                return redirect('dashboard')
+                return redirect('admin_dashboard' if is_admin(user) else 'dashboard')
             messages.error(request, 'Invalid verification code.')
         else:
             if pyotp.TOTP(profile.totp_secret).verify(entered):
@@ -301,7 +301,7 @@ def mfa_verify(request):
 
 def logout_view(request):
     logout(request)
-    return redirect('login')
+    return redirect('home')
 
 
 # ── ADMIN — DASHBOARD ─────────────────────────────────────────────────────────
@@ -373,11 +373,11 @@ def admin_dashboard(request):
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
 def admin_users(request):
-    from .models import Profile
+    from .models import UserProfile as Profile
     users_qs = (
         User.objects.filter(is_superuser=False)
         .select_related('profile')
-        .annotate(task_count=Count('task', filter=Q(task__completed=True)))
+        .annotate(task_count=Count('tasks', filter=Q(tasks__completed=True)))
         .order_by('-date_joined')
     )
     user_list = [{
@@ -637,6 +637,8 @@ def admin_delete_post(request, post_id):
 @login_required
 @csrf_protect
 def dashboard(request):
+    if is_admin(request.user):
+        return redirect('admin_dashboard')
     metrics       = calculate_user_metrics(request.user)
     today         = date.today()
     start_of_week = today - timedelta(days=today.weekday())
@@ -1351,6 +1353,86 @@ def search_documents(request):
 
 @login_required
 def notifications_view(request):
-    notifs = Notification.objects.filter(user=request.user)
+    notifs = Notification.objects.filter(user=request.user).order_by('-created_at')
     notifs.filter(is_read=False).update(is_read=True)
     return render(request, 'main/notifications.html', {'notifications': notifs})
+
+
+# ── ADMIN — USER ACTIONS ──────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url='login')
+def admin_user_profile(request, user_id):
+    u = get_object_or_404(User, id=user_id)
+    p, _ = UserProfile.objects.get_or_create(user=u)
+    return JsonResponse({
+        'full_name':   u.get_full_name() or u.username,
+        'username':    u.username,
+        'email':       u.email,
+        'date_joined': u.date_joined.strftime('%Y-%m-%d'),
+        'major':       p.major,
+        'streak':      p.streak,
+        'is_active':   u.is_active,
+        'is_staff':    u.is_staff,
+    })
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url='login')
+@require_POST
+def admin_send_email(request, user_id):
+    u    = get_object_or_404(User, id=user_id)
+    data = json.loads(request.body)
+    sub  = data.get('subject', 'Message from StudyOptimizer Admin')
+    msg  = data.get('message', '')
+    try:
+        send_mail(sub, msg, settings.DEFAULT_FROM_EMAIL, [u.email], fail_silently=False)
+        Notification.objects.create(user=u, message=f"Admin sent you an email: {sub}")
+        return JsonResponse({'status': 'ok'})
+    except Exception:
+        return JsonResponse({'status': 'error'}, status=500)
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url='login')
+@require_POST
+def admin_toggle_account(request, user_id):
+    u = get_object_or_404(User, id=user_id)
+    if u.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Cannot disable superuser'}, status=403)
+    u.is_active = not u.is_active
+    u.save()
+    action = 'enabled' if u.is_active else 'disabled'
+    Notification.objects.create(user=u, message=f"Your account has been {action} by an administrator.")
+    return JsonResponse({'status': 'ok', 'is_active': u.is_active, 'action': action})
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url='login')
+@require_POST
+def admin_reset_pw(request, user_id):
+    u = get_object_or_404(User, id=user_id)
+    # Placeholder for real password reset link
+    Notification.objects.create(user=u, message="An administrator has initiated a password reset for your account.")
+    return JsonResponse({'status': 'ok'})
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url='login')
+@require_POST
+def admin_grant_admin(request, user_id):
+    u = get_object_or_404(User, id=user_id)
+    if u == request.user:
+        return JsonResponse({'status': 'error', 'message': 'Cannot modify own admin status'}, status=403)
+    u.is_staff = not u.is_staff
+    u.save()
+    action = 'granted' if u.is_staff else 'revoked'
+    Notification.objects.create(user=u, message=f"Administrator access has been {action} for your account.")
+    return JsonResponse({'status': 'ok', 'is_staff': u.is_staff, 'action': action})
+
+@login_required(login_url='login')
+@user_passes_test(is_admin, login_url='login')
+@require_POST
+def admin_delete_user(request, user_id):
+    u = get_object_or_404(User, id=user_id)
+    if u.is_superuser or u == request.user:
+        return JsonResponse({'status': 'error', 'message': 'Cannot delete superuser/self'}, status=403)
+    name = u.username
+    u.delete()
+    return JsonResponse({'status': 'ok', 'deleted_name': name})

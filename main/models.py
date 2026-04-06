@@ -71,6 +71,7 @@ class Task(models.Model):
     priority  = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     due_date  = models.DateField()
     completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -107,6 +108,7 @@ class SharedMaterial(models.Model):
     views        = models.IntegerField(default=0)
     created_at   = models.DateTimeField(auto_now_add=True)
     is_anonymous = models.BooleanField(default=False)
+    is_hidden    = models.BooleanField(default=False)
     emoji        = models.CharField(max_length=10, default='📄')
 
     def __str__(self):
@@ -200,6 +202,16 @@ class KnownIP(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.ip_address}"
+
+
+class Notification(models.Model):
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    message    = models.TextField()
+    is_read    = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notification for {self.user.username}"
 
 
 # ─── Signals ──────────────────────────────────────────────────────────────────
