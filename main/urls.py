@@ -10,7 +10,7 @@ urlpatterns = [
     path('mfa_verify/', views.mfa_verify, name='mfa_verify'),
     path('setup_totp/', views.setup_totp, name='setup_totp'),
     path('google-login/', views.google_login, name='google_login'),
-    path('logout/', LogoutView.as_view(next_page='home'), name='logout'),
+    path('logout/', views.logout_view, name='logout'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('progress/', views.progress, name='progress'),
     path('upload/', views.upload, name='upload'),
@@ -40,4 +40,11 @@ urlpatterns = [
     path('admin-panel/ai/',             views.admin_ai,            name='admin_ai'),
     path('admin-panel/analytics/',      views.admin_analytics,     name='admin_analytics'),
     path('admin-panel/audit-logs/',     views.admin_audit,         name='admin_audit'),
+    # Admin User Actions
+    path('admin-panel/users/<int:user_id>/profile/',    views.admin_user_profile,  name='admin_user_profile'),
+    path('admin-panel/users/<int:user_id>/send-email/', views.admin_send_email,     name='admin_send_email'),
+    path('admin-panel/users/<int:user_id>/disable/',    views.admin_toggle_account, name='admin_toggle_account'),
+    path('admin-panel/users/<int:user_id>/reset-pw/',   views.admin_reset_pw,      name='admin_reset_pw'),
+    path('admin-panel/users/<int:user_id>/grant-admin/', views.admin_grant_admin,  name='admin_grant_admin'),
+    path('admin-panel/users/<int:user_id>/delete/',     views.admin_delete_user,   name='admin_delete_user'),
 ]
