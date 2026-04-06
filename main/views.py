@@ -19,6 +19,8 @@ from django.contrib.sessions.models import Session
 from django.utils import timezone
 from django.conf import settings
 from django.core.mail import send_mail
+from .admin_email import send_admin_notification
+
 
 import os
 try:
@@ -128,29 +130,42 @@ def register(request):
 
         if not re.match(r'^[a-zA-Z0-9_\.\-]{3,150}$', username):
             messages.error(request, 'Invalid username format.')
-            return redirect('register')
+            return render(request, 'main/register.html', {'submitted_username': username, 'submitted_email': email})
         try:
             validate_email(email)
         except ValidationError:
             messages.error(request, 'Invalid email format.')
-            return redirect('register')
+            return render(request, 'main/register.html', {'submitted_username': username, 'submitted_email': email})
         if password != password2:
             messages.error(request, 'Passwords do not match.')
-            return redirect('register')
+            return render(request, 'main/register.html', {'submitted_username': username, 'submitted_email': email})
         try:
             validate_password(password, User(username=username, email=email))
         except ValidationError as e:
             for msg in e.messages:
                 messages.error(request, msg)
-            return redirect('register')
+            return render(request, 'main/register.html', {'submitted_username': username, 'submitted_email': email})
         if User.objects.filter(username=username).exists():
             messages.error(request, 'Username already taken.')
-            return redirect('register')
+            return render(request, 'main/register.html', {'submitted_username': username, 'submitted_email': email})
         if User.objects.filter(email=email).exists():
             messages.error(request, 'Email is already registered.')
-            return redirect('register')
+            return render(request, 'main/register.html', {'submitted_username': username, 'submitted_email': email})
 
-        User.objects.create_user(username=username, email=email, password=password)
+        user = User.objects.create_user(username=username, email=email, password=password)
+        
+        # Send Welcome Email
+        try:
+            send_mail(
+                'Welcome to Study Optimizer!',
+                f'Hi {username},\n\nWelcome to Study Optimizer! Your account has been created successfully. We are excited to have you on board as you organize and optimize your studies.\n\nBest regards,\nThe Study Optimizer Team',
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=True,
+            )
+        except Exception as e:
+            print(f"Failed to send welcome email: {e}")
+
         messages.success(request, 'Account created successfully. Please log in.')
         return redirect('login')
 
@@ -595,6 +610,12 @@ def admin_hide_post(request, post_id):
     if action == 'hide':
         post.is_hidden = True
         post.save()
+        msg = f'Hello {post.author.get_full_name() or post.author.username},\n\nYour post "{post.title}" has been hidden by a moderator because it may contain inappropriate content or violates our community guidelines.'
+        try:
+            send_admin_notification('Post Hidden Notification', msg, [post.author.email])
+        except Exception as e:
+            print(f"Error sending email: {e}")
+
         Notification.objects.create(
             user=post.author,
             message=(
@@ -605,6 +626,12 @@ def admin_hide_post(request, post_id):
     elif action == 'unhide':
         post.is_hidden = False
         post.save()
+        msg = f'Hello {post.author.get_full_name() or post.author.username},\n\nYour post "{post.title}" has been reviewed and is now visible again.'
+        try:
+            send_admin_notification('Post Visible Notification', msg, [post.author.email])
+        except Exception as e:
+            print(f"Error sending email: {e}")
+
         Notification.objects.create(
             user=post.author,
             message=f'Your post "{post.title}" has been reviewed and is now visible again.',
@@ -621,6 +648,12 @@ def admin_delete_post(request, post_id):
     if request.method != 'DELETE':
         return JsonResponse({'status': 'error'}, status=405)
     post = get_object_or_404(SharedMaterial, id=post_id)
+    msg = f'Hello {post.author.get_full_name() or post.author.username},\n\nYour post "{post.title}" has been permanently removed by a moderator for violating our community guidelines.'
+    try:
+        send_admin_notification('Post Removal Notification', msg, [post.author.email])
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
     Notification.objects.create(
         user=post.author,
         message=(
@@ -1386,11 +1419,12 @@ def admin_send_email(request, user_id):
     sub  = data.get('subject', 'Message from StudyOptimizer Admin')
     msg  = data.get('message', '')
     try:
-        send_mail(sub, msg, settings.DEFAULT_FROM_EMAIL, [u.email], fail_silently=False)
+        send_admin_notification(sub, msg, [u.email])
         Notification.objects.create(user=u, message=f"Admin sent you an email: {sub}")
         return JsonResponse({'status': 'ok'})
-    except Exception:
-        return JsonResponse({'status': 'error'}, status=500)
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
@@ -1402,6 +1436,15 @@ def admin_toggle_account(request, user_id):
     u.is_active = not u.is_active
     u.save()
     action = 'enabled' if u.is_active else 'disabled'
+    msg = f"Hello {u.get_full_name() or u.username},\n\nYour account has been {action} by an administrator."
+    if not u.is_active:
+        msg += "\nIf you think this is a mistake, please contact support."
+    
+    try:
+        send_admin_notification(f"Account {action.capitalize()}", msg, [u.email])
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
     Notification.objects.create(user=u, message=f"Your account has been {action} by an administrator.")
     return JsonResponse({'status': 'ok', 'is_active': u.is_active, 'action': action})
 
@@ -1410,8 +1453,22 @@ def admin_toggle_account(request, user_id):
 @require_POST
 def admin_reset_pw(request, user_id):
     u = get_object_or_404(User, id=user_id)
-    # Placeholder for real password reset link
-    Notification.objects.create(user=u, message="An administrator has initiated a password reset for your account.")
+    # Password reset logic
+    new_password = User.objects.make_random_password()
+    u.set_password(new_password)
+    u.save()
+
+    msg = (f"Hello {u.get_full_name() or u.username},\n\n"
+           f"An administrator has reset your password. Your new temporary password is:\n\n"
+           f"{new_password}\n\n"
+           "Please log in and change it as soon as possible.")
+    
+    try:
+        send_admin_notification("Password Reset Notification", msg, [u.email])
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+    Notification.objects.create(user=u, message="An administrator has reset your password.")
     return JsonResponse({'status': 'ok'})
 
 @login_required(login_url='login')
@@ -1424,6 +1481,13 @@ def admin_grant_admin(request, user_id):
     u.is_staff = not u.is_staff
     u.save()
     action = 'granted' if u.is_staff else 'revoked'
+    msg = f"Hello {u.get_full_name() or u.username},\n\nAdministrator privileges have been {action} for your account."
+    
+    try:
+        send_admin_notification(f"Admin Privilege {action.capitalize()}", msg, [u.email])
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
     Notification.objects.create(user=u, message=f"Administrator access has been {action} for your account.")
     return JsonResponse({'status': 'ok', 'is_staff': u.is_staff, 'action': action})
 
@@ -1434,6 +1498,16 @@ def admin_delete_user(request, user_id):
     u = get_object_or_404(User, id=user_id)
     if u.is_superuser or u == request.user:
         return JsonResponse({'status': 'error', 'message': 'Cannot delete superuser/self'}, status=403)
+    
     name = u.username
+    email = u.email
+
+    # Send deletion notice before deleting
+    msg = f"Hello {u.get_full_name() or u.username},\n\nThis is an automated notification that your Study Optimizer account has been permanently deleted by an administrator.\n\nIf you believe this was an error, please contact support."
+    try:
+        send_admin_notification("Account Deletion Notice", msg, [email])
+    except Exception as e:
+        print(f"Error sending deletion email: {e}")
+
     u.delete()
     return JsonResponse({'status': 'ok', 'deleted_name': name})

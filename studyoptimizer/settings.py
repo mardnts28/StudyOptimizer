@@ -86,6 +86,31 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 
+# ----------------------------------------------------------------------
+# ADMIN-ONLY EMAIL SETTINGS (independent of the existing security EMAIL vars)
+# ----------------------------------------------------------------------
+ADMIN_EMAIL_BACKEND = config(
+    'ADMIN_EMAIL_BACKEND',
+    default='django.core.mail.backends.smtp.EmailBackend',
+)
+ADMIN_EMAIL_HOST = config('ADMIN_EMAIL_HOST', default='smtp.gmail.com')
+ADMIN_EMAIL_PORT = config('ADMIN_EMAIL_PORT', cast=int, default=587)
+ADMIN_EMAIL_HOST_USER = config('ADMIN_EMAIL_HOST_USER', default='')
+ADMIN_EMAIL_HOST_PASSWORD = config('ADMIN_EMAIL_HOST_PASSWORD', default='')
+ADMIN_EMAIL_USE_TLS = config('ADMIN_EMAIL_USE_TLS', cast=bool, default=True)
+
+def get_admin_email_connection():
+    from django.core.mail import get_connection
+    return get_connection(
+        backend=ADMIN_EMAIL_BACKEND,
+        host=ADMIN_EMAIL_HOST,
+        port=ADMIN_EMAIL_PORT,
+        username=ADMIN_EMAIL_HOST_USER,
+        password=ADMIN_EMAIL_HOST_PASSWORD,
+        use_tls=ADMIN_EMAIL_USE_TLS,
+    )
+
+
 # Google OAuth Credentials
 GOOGLE_OAUTH_CLIENT_ID = config('GOOGLE_OAUTH_CLIENT_ID', default='')
 GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_OAUTH_CLIENT_SECRET', default='')
