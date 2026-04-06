@@ -34,35 +34,57 @@ def extract_text_from_file(file):
         
     return content
 
-def generate_document_summary(text):
-    """Generates a structured summary using Gemini AI."""
+def generate_document_summary(text, file_name='Document'):
+    """Generates a structured summary using Gemini AI. Returns (summary_text, title_line)."""
     if not text:
-        return "No content to summarize."
-        
+        return "No content to summarize.", file_name
+
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"Please provide a clear and concise summary of the following text, focused on key concepts for studying:\n\n{text[:10000]}"
+        prompt = (
+            f"You are a study assistant. Summarize the following document titled '{file_name}' "
+            f"clearly and concisely for a student. Focus on key concepts, definitions, and important points.\n\n"
+            f"{text[:10000]}"
+        )
         response = model.generate_content(prompt)
-        return response.text
+        summary_text = response.text
+        # Extract a short title from the first line if possible
+        first_line = summary_text.strip().split('\n')[0][:120]
+        title_line = first_line if first_line else file_name
+        return summary_text, title_line
     except Exception as e:
         print(f"AI Error: {e}")
-        return "The AI was unable to summarize this document at this time."
+        fallback = "The AI was unable to summarize this document at this time."
+        return fallback, file_name
 
 def calculate_user_metrics(user):
     """Calculates dashboard and progress analytics."""
     now = timezone.now()
-    week_ago = now - timedelta(days=7)
 
     # 1. Basic Stats
     tasks_all       = Task.objects.filter(user=user)
     completed_tasks = tasks_all.filter(completed=True).count()
     summaries_count = SummarizedDocument.objects.filter(user=user).count()
-    
+
     # 2. Level Calculation
     user_level = (completed_tasks // 5) + 1
     next_level_progress = ((completed_tasks % 5) / 5) * 100
 
-    # 3. Weekly Hours Trend (Summary count per day for last 7 days)
+    # 3. Study Streak (consecutive days with completed tasks)
+    streak = 0
+    check_day = now.date()
+    for _ in range(365):
+        had_activity = (
+            tasks_all.filter(completed=True, created_at__date=check_day).exists() or
+            SummarizedDocument.objects.filter(user=user, created_at__date=check_day).exists()
+        )
+        if had_activity:
+            streak += 1
+            check_day -= timedelta(days=1)
+        else:
+            break
+
+    # 4. Weekly Hours Trend (last 7 days)
     weekly_hours_trend = []
     for i in range(6, -1, -1):
         day = (now - timedelta(days=i)).date()
@@ -70,30 +92,34 @@ def calculate_user_metrics(user):
                 SummarizedDocument.objects.filter(user=user, created_at__date=day).count()
         weekly_hours_trend.append(day_h)
 
-    # 4. Subject Distribution
+    # 5. Subject Distribution
     subject_qs = tasks_all.values('subject').annotate(count=Count('id')).order_by('-count')[:5]
     subject_labels = [s['subject'] or 'General' for s in subject_qs]
     subject_data   = [s['count'] for s in subject_qs]
 
+    total = tasks_all.count()
     return {
         'user_level':          user_level,
         'next_level_progress': int(next_level_progress),
         'docs_count':          summaries_count,
+        'summaries_count':     summaries_count,
         'completed_count':     completed_tasks,
-        'total_tasks':         tasks_all.count(),
-        'completion_rate':     round((completed_tasks / tasks_all.count() * 100), 1) if tasks_all.count() > 0 else 0,
+        'total_tasks':         total,
+        'completion_rate':     round((completed_tasks / total * 100), 1) if total > 0 else 0,
         'study_hours':         (completed_tasks * 2) + summaries_count,
+        'streak':              streak,
         'weekly_hours_trend':  weekly_hours_trend,
         'subject_labels':      subject_labels,
         'subject_data':        subject_data,
     }
 
-def generate_batch_synthesis(summaries_qs):
+def generate_batch_synthesis(doc_ids, user):
     """Synthesizes multiple summaries into one master study guide."""
+    summaries_qs = SummarizedDocument.objects.filter(id__in=doc_ids, user=user)
     combined_text = "\n\n".join([s.summary_text for s in summaries_qs])
     if not combined_text:
         return "No summaries selected."
-        
+
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"Synthesize these individual study summaries into one master study guide:\n\n{combined_text[:10000]}"
