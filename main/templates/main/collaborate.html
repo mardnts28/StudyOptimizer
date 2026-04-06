@@ -289,6 +289,11 @@
                             <i data-lucide="heart" class="w-5 h-5" :class="{'fill-current': viewingSummary?.liked}"></i>
                             <span x-text="viewingSummary?.likes"></span>
                         </button>
+                        <template x-if="viewingSummary?.id">
+                            <a :href="'/collaborate/download/' + viewingSummary.id + '/'" class="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-red-700 transition-colors border px-3 py-1.5 rounded-lg bg-white border-gray-200 hover:border-red-300 shadow-sm ml-2">
+                                <i data-lucide="download" class="w-4 h-4 text-red-600"></i> Download PDF
+                            </a>
+                        </template>
                     </div>
                     <button @click="isViewModalOpen = false" class="text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-widest">Close Reader</button>
                 </div>
