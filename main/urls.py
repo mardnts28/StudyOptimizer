@@ -42,9 +42,7 @@ urlpatterns = [
     path('admin-panel/audit-logs/',     views.admin_audit,         name='admin_audit'),
     # Admin User Actions
     path('admin-panel/users/<int:user_id>/profile/',    views.admin_user_profile,  name='admin_user_profile'),
-    path('admin-panel/users/<int:user_id>/send-email/', views.admin_send_email,     name='admin_send_email'),
     path('admin-panel/users/<int:user_id>/disable/',    views.admin_toggle_account, name='admin_toggle_account'),
-    path('admin-panel/users/<int:user_id>/reset-pw/',   views.admin_reset_pw,      name='admin_reset_pw'),
     path('admin-panel/users/<int:user_id>/grant-admin/', views.admin_grant_admin,  name='admin_grant_admin'),
     path('admin-panel/users/<int:user_id>/delete/',     views.admin_delete_user,   name='admin_delete_user'),
 ]

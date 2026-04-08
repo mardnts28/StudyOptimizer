@@ -132,12 +132,10 @@
 
     <div class="dropdown-menu">
       <button class="dropdown-item" onclick="doViewProfile(this)"><i class="fas fa-eye"></i> View Profile</button>
-      <button class="dropdown-item" onclick="doSendEmail(this)"><i class="fas fa-envelope"></i> Send Email</button>
       <button class="dropdown-item" onclick="doToggleAccount(this)">
         <i class="fas fa-ban"></i>
         <span class="toggle-label">{% if u.is_active %}Disable Account{% else %}Enable Account{% endif %}</span>
       </button>
-      <button class="dropdown-item" onclick="doResetPassword(this)"><i class="fas fa-rotate-right"></i> Reset Password</button>
       <button class="dropdown-item" onclick="doToggleAdmin(this)">
         <i class="fas fa-shield"></i>
         <span class="admin-label">{% if u.is_staff %}Revoke Admin Access{% else %}Grant Admin Access{% endif %}</span>
@@ -152,19 +150,6 @@
 
 <!-- ── MODALS ──────────────────────────────────────────────────────────── -->
 
-<!-- Send Email Modal -->
-<div class="modal-overlay" id="emailModal">
-  <div class="modal-box">
-    <div class="modal-title">Send Email</div>
-    <div class="modal-sub" id="emailModalSub">Sending to: —</div>
-    <input class="modal-input" id="emailSubject" placeholder="Subject">
-    <textarea class="modal-input" id="emailBody" rows="5" placeholder="Message…"></textarea>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal('emailModal')">Cancel</button>
-      <button class="btn-confirm" onclick="submitEmail()">Send</button>
-    </div>
-  </div>
-</div>
 
 <!-- Admin Password Modal -->
 <div class="modal-overlay" id="passwordModal">
@@ -257,28 +242,6 @@ function doViewProfile(btn) {
     .catch(() => { document.getElementById('profileContent').textContent = 'Failed to load.'; });
 }
 
-/* ── Send Email ───────────────────────────────────────────────────────── */
-let _emailUserId = null;
-function doSendEmail(btn) {
-  _emailUserId = getUserId(btn);
-  const name   = getRow(btn).dataset.name;
-  document.getElementById('emailModalSub').textContent = `Sending to: ${name}`;
-  document.getElementById('emailSubject').value = '';
-  document.getElementById('emailBody').value    = '';
-  openModal('emailModal');
-}
-function submitEmail() {
-  const subject = document.getElementById('emailSubject').value.trim();
-  const message = document.getElementById('emailBody').value.trim();
-  if (!subject || !message) { toast('Fill in subject and message.', false); return; }
-  fetch(`/admin-panel/users/${_emailUserId}/send-email/`, {
-    method:'POST', headers:{'X-CSRFToken':CSRF,'Content-Type':'application/json'},
-    body: JSON.stringify({subject, message})
-  }).then(r=>r.json()).then(d => {
-    if (d.status==='ok') { closeModal('emailModal'); toast('Email sent & user notified ✉️'); }
-    else toast('Failed to send email.', false);
-  });
-}
 
 /* ── Disable / Enable Account ────────────────────────────────────────── */
 function doToggleAccount(btn) {
@@ -311,17 +274,6 @@ function doToggleAccount(btn) {
   );
 }
 
-/* ── Reset Password ─────────────────────────────────────────────────── */
-function doResetPassword(btn) {
-  const id   = getUserId(btn);
-  const name = getRow(btn).dataset.name;
-  showConfirm('Reset password?', `Send a password-reset link to ${name}?`, () => {
-    fetch(`/admin-panel/users/${id}/reset-pw/`, {method:'POST', headers:{'X-CSRFToken':CSRF}})
-      .then(r=>r.json()).then(d => {
-        if(d.status==='ok') toast('Reset link sent & user notified 🔑');
-      });
-  }, false);
-}
 
 /* ── Grant / Revoke Admin ────────────────────────────────────────────── */
 function doToggleAdmin(btn) {

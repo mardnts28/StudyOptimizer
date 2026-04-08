@@ -1503,22 +1503,6 @@ def admin_user_profile(request, user_id):
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
 @require_POST
-def admin_send_email(request, user_id):
-    u    = get_object_or_404(User, id=user_id)
-    data = json.loads(request.body)
-    sub  = data.get('subject', 'Message from StudyOptimizer Admin')
-    msg  = data.get('message', '')
-    try:
-        send_admin_notification(sub, msg, [u.email])
-        Notification.objects.create(user=u, message=f"Admin sent you an email: {sub}")
-        return JsonResponse({'status': 'ok'})
-    except Exception as e:
-        print(f"Error sending email: {e}")
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-@login_required(login_url='login')
-@user_passes_test(is_admin, login_url='login')
-@require_POST
 def admin_toggle_account(request, user_id):
     u = get_object_or_404(User, id=user_id)
     if u.is_superuser:
@@ -1535,25 +1519,6 @@ def admin_toggle_account(request, user_id):
         print(f"Error sending email: {e}")
     Notification.objects.create(user=u, message=f"Your account has been {action} by an administrator.")
     return JsonResponse({'status': 'ok', 'is_active': u.is_active, 'action': action})
-
-@login_required(login_url='login')
-@user_passes_test(is_admin, login_url='login')
-@require_POST
-def admin_reset_pw(request, user_id):
-    u = get_object_or_404(User, id=user_id)
-    new_password = User.objects.make_random_password()
-    u.set_password(new_password)
-    u.save()
-    msg = (f"Hello {u.get_full_name() or u.username},\n\n"
-           f"An administrator has reset your password. Your new temporary password is:\n\n"
-           f"{new_password}\n\n"
-           "Please log in and change it as soon as possible.")
-    try:
-        send_admin_notification("Password Reset Notification", msg, [u.email])
-    except Exception as e:
-        print(f"Error sending email: {e}")
-    Notification.objects.create(user=u, message="An administrator has reset your password.")
-    return JsonResponse({'status': 'ok'})
 
 @login_required(login_url='login')
 @user_passes_test(is_admin, login_url='login')
