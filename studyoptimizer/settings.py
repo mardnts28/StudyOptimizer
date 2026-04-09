@@ -65,6 +65,8 @@ MIDDLEWARE = [
     'csp.middleware.CSPMiddleware',
 ]
 
+WHITENOISE_MANIFEST_STRICT = False
+
 ROOT_URLCONF = 'studyoptimizer.urls'
 
 TEMPLATES = [
