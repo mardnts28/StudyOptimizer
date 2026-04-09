@@ -584,10 +584,12 @@ def admin_audit(request):
     
     security_logs = []
     for log in raw_logs:
-        # STRIDE Logic: Verify cryptographic integrity
-        payload = f"{log.user}{log.action}{log.details}{log.timestamp}{log.previous_hash}"
-        calc_hash = hashlib.sha256(payload.encode()).hexdigest()
-        is_tampered = (log.current_hash != calc_hash)
+        try:
+            # Re-generate hash using the model's logic to verify integrity
+            calc_hash = log.generate_hash()
+            is_tampered = (log.current_hash != calc_hash)
+        except Exception:
+            is_tampered = False
 
         is_critical = is_tampered or any(word in log.action.upper() for word in ['DELETE', 'FAILED', 'UNAUTHORIZED', 'REVOKED'])
         

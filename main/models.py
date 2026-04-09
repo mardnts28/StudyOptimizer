@@ -192,19 +192,24 @@ class AuditLog(models.Model):
     previous_hash = models.CharField(max_length=64, blank=True)
     current_hash = models.CharField(max_length=64, blank=True)
 
+    def generate_hash(self):
+        """Standardized method to generate audit hash to prevent view/model mismatches."""
+        from django.utils import timezone
+        ts = self.timestamp.isoformat() if self.timestamp else timezone.now().isoformat()
+        user_id = self.user.id if self.user else 'System'
+        prev = self.previous_hash or "GENESIS"
+        payload = f"{user_id}{self.action}{self.details}{ts}{prev}"
+        return hashlib.sha256(payload.encode()).hexdigest()
+
     def save(self, *args, **kwargs):
         if not self.pk:
             from django.utils import timezone
-            # Set timestamp manually if it's not yet set (auto_now_add is only set AFTER save)
             if not self.timestamp:
                 self.timestamp = timezone.now()
             
             last_entry = AuditLog.objects.order_by("-timestamp").first()
             self.previous_hash = last_entry.current_hash if last_entry else "GENESIS"
-            
-            # Ensure the payload is a clean string
-            payload = f"{self.user.id if self.user else 'System'}{self.action}{self.details}{self.timestamp.isoformat()}{self.previous_hash}"
-            self.current_hash = hashlib.sha256(payload.encode()).hexdigest()
+            self.current_hash = self.generate_hash()
         super().save(*args, **kwargs)
 
 class KnownIP(models.Model):
