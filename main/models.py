@@ -194,9 +194,16 @@ class AuditLog(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.pk:
+            from django.utils import timezone
+            # Set timestamp manually if it's not yet set (auto_now_add is only set AFTER save)
+            if not self.timestamp:
+                self.timestamp = timezone.now()
+            
             last_entry = AuditLog.objects.order_by("-timestamp").first()
             self.previous_hash = last_entry.current_hash if last_entry else "GENESIS"
-            payload = f"{self.user}{self.action}{self.details}{self.timestamp}{self.previous_hash}"
+            
+            # Ensure the payload is a clean string
+            payload = f"{self.user.id if self.user else 'System'}{self.action}{self.details}{self.timestamp.isoformat()}{self.previous_hash}"
             self.current_hash = hashlib.sha256(payload.encode()).hexdigest()
         super().save(*args, **kwargs)
 
