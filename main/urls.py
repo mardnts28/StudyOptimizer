@@ -28,6 +28,7 @@ urlpatterns = [
     path('collaborate/comments/<int:material_id>/', views.get_material_comments, name='get_comments'),
     path('collaborate/comments/<int:material_id>/add/', views.add_comment, name='add_comment'),
     path('collaborate/download/<int:material_id>/', views.download_shared_pdf, name='download_shared_pdf'),
+    path('collaborate/view/<int:material_id>/', views.view_shared_file, name='view_shared_file'),
     path('tasks/schedule/add/', views.add_schedule_item, name='add_schedule'),
     path('tasks/schedule/edit/<int:item_id>/', views.edit_schedule_item, name='edit_schedule'),
     path('tasks/schedule/delete/<int:item_id>/', views.delete_schedule_item, name='delete_schedule'),

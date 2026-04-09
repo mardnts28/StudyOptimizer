@@ -34,7 +34,8 @@ IS_LOCAL = DEBUG or socket.gethostname() in ["localhost", "127.0.0.1"]
 if IS_LOCAL:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 else:
-    ALLOWED_HOSTS = ['your-production-domain.com']
+    # Use config for PRODUCTION host or default to wildcard (safe if using Render/Railway)
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
 
 # Application definition
 
@@ -53,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # ── STATIC FILES ──
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -126,19 +128,19 @@ GOOGLE_OAUTH_CLIENT_SECRET = config('GOOGLE_OAUTH_CLIENT_SECRET', default='')
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT'),
-        'OPTIONS': {
-            'options': '-c search_path=app_schema,public'
-        }
-    }
+    'default': config(
+        'DATABASE_URL',
+        default=f"postgres://{config('DB_USER')}:{config('DB_PASSWORD')}@{config('DB_HOST')}:{config('DB_PORT')}/{config('DB_NAME')}",
+        cast=dj_database_url.parse
+    )
 }
+
+# Fix search path if using custom schema (Render/Railway default is usually 'public')
+if config('DATABASE_URL', default=None) is None:
+    DATABASES['default']['OPTIONS'] = {'options': '-c search_path=app_schema,public'}
 
 
 # Password validation
@@ -195,7 +197,10 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Cloudinary Storage Configuration
-if config('CLOUDINARY_CLOUD_NAME', default=''):
+CLOUDINARY_URL = config('CLOUDINARY_URL', default='')
+CL_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
+
+if CLOUDINARY_URL or CL_NAME:
     STORAGES = {
         "default": {
             "BACKEND": "cloudinary_storage.storage.RawMediaCloudinaryStorage",
@@ -204,11 +209,17 @@ if config('CLOUDINARY_CLOUD_NAME', default=''):
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
-    CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
-        'API_KEY': config('CLOUDINARY_API_KEY'),
-        'API_SECRET': config('CLOUDINARY_API_SECRET'),
-    }
+    
+    if CLOUDINARY_URL:
+        CLOUDINARY_STORAGE = {
+            'CLOUDINARY_URL': CLOUDINARY_URL,
+        }
+    else:
+        CLOUDINARY_STORAGE = {
+            'CLOUD_NAME': CL_NAME,
+            'API_KEY': config('CLOUDINARY_API_KEY'),
+            'API_SECRET': config('CLOUDINARY_API_SECRET'),
+        }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

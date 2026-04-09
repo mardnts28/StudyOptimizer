@@ -265,18 +265,59 @@
                         <p class="text-gray-700 leading-loose whitespace-pre-line text-base" x-html="viewingSummary?.preview"></p>
                     </div>
                     
-                    <template x-if="viewingSummary?.file_url">
-                        <div class="p-6 bg-gradient-to-br from-red-50 to-white border-2 border-dashed border-red-200 rounded-[2rem] flex items-center justify-between">
+                    <!-- Hybrid Preview Section (Images and PDFs) -->
+                    <template x-if="viewingSummary?.id && viewingSummary?.file_url">
+                        <div class="space-y-4">
+                            <!-- Image Preview -->
+                            <template x-if="viewingSummary?.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)">
+                                <div class="rounded-2xl border-2 border-gray-100 overflow-hidden shadow-inner bg-gray-50 mb-4">
+                                    <img :src="viewingSummary.file_url" class="w-full h-auto max-h-[400px] object-contain mx-auto" alt="Attachment Preview">
+                                </div>
+                            </template>
+
+                            <!-- PDF Interactive Reader (Embedded via internal proxy) -->
+                            <template x-if="viewingSummary?.file_url?.match(/\.pdf$/i)">
+                                <div class="rounded-3xl border-2 border-red-50 overflow-hidden shadow-2xl bg-white mb-6 h-[600px] ring-1 ring-black/5">
+                                    <iframe :src="'/collaborate/view/' + viewingSummary.id + '/#toolbar=0'" class="w-full h-full border-none" title="PDF Reader"></iframe>
+                                </div>
+                            </template>
+                            
+                            <!-- Enhanced Action Center -->
+                            <div class="p-6 bg-gradient-to-br from-gray-50 to-white border-2 border-gray-100 rounded-[2rem] flex items-center justify-between shadow-sm">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center text-red-600">
+                                        <i data-lucide="file-check" class="w-7 h-7"></i>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-gray-900 tracking-tight">Attached Study Material</div>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md font-bold uppercase tracking-widest">Verified Content</span>
+                                            <span class="text-[10px] text-gray-300">|</span>
+                                            <a :href="'/collaborate/view/' + viewingSummary.id + '/'" target="_blank" class="text-[11px] text-red-600 font-extrabold uppercase tracking-widest hover:text-red-700 underline underline-offset-4 decoration-2">Open Full Tab ↗</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <a :href="'/collaborate/download/' + viewingSummary.id + '/'" download class="group relative flex items-center justify-center w-14 h-14 bg-gray-900 text-white rounded-full shadow-xl hover:bg-black hover:scale-105 active:scale-95 transition-all">
+                                    <i data-lucide="download" class="w-6 h-6"></i>
+                                    <span class="absolute -bottom-10 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-bold text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-100">DOWNLOAD PDF</span>
+                                </a>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <!-- Fallback if no file exists (Download as Summary PDF) -->
+                    <template x-if="viewingSummary?.id && !viewingSummary?.file_url">
+                        <div class="p-6 bg-gradient-to-br from-gray-50 to-white border-2 border-dashed border-gray-200 rounded-[2rem] flex items-center justify-between">
                             <div class="flex items-center gap-4">
-                                <div class="w-14 h-14 bg-red-100/50 rounded-2xl flex items-center justify-center text-red-700 shadow-inner">
-                                    <i data-lucide="file-text" class="w-7 h-7"></i>
+                                <div class="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
+                                    <i data-lucide="file-type" class="w-7 h-7"></i>
                                 </div>
                                 <div>
-                                    <div class="font-bold text-gray-900">Shared Resource</div>
-                                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Download Attachment</div>
+                                    <div class="font-bold text-gray-900">Summary Transcript</div>
+                                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Available as PDF</div>
                                 </div>
                             </div>
-                            <a :href="viewingSummary.file_url" download class="w-12 h-12 bg-red-700 hover:bg-red-800 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-red-200 hover:-translate-y-1 transition-all">
+                            <a :href="'/collaborate/download/' + viewingSummary.id + '/'" download class="w-12 h-12 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center shadow-lg transition-all">
                                 <i data-lucide="download" class="w-5 h-5"></i>
                             </a>
                         </div>
@@ -289,11 +330,6 @@
                             <i data-lucide="heart" class="w-5 h-5" :class="{'fill-current': viewingSummary?.liked}"></i>
                             <span x-text="viewingSummary?.likes"></span>
                         </button>
-                        <template x-if="viewingSummary?.id">
-                            <a :href="'/collaborate/download/' + viewingSummary.id + '/'" class="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-red-700 transition-colors border px-3 py-1.5 rounded-lg bg-white border-gray-200 hover:border-red-300 shadow-sm ml-2">
-                                <i data-lucide="download" class="w-4 h-4 text-red-600"></i> Download PDF
-                            </a>
-                        </template>
                     </div>
                     <button @click="isViewModalOpen = false" class="text-sm font-bold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-widest">Close Reader</button>
                 </div>
@@ -460,6 +496,11 @@
                             this.sharedSummaries = this.sharedSummaries.map(s => 
                                 s.id === id ? { ...s, liked: data.liked, likes: data.likes_count } : s
                             );
+                            // Sync modal if open
+                            if (this.viewingSummary && this.viewingSummary.id === id) {
+                                this.viewingSummary.liked = data.liked;
+                                this.viewingSummary.likes = data.likes_count;
+                            }
                         }
                     } catch (error) {
                         console.error('Error toggling like:', error);

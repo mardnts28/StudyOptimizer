@@ -4,10 +4,11 @@ from django.db.models import Count, Sum
 from .models import Task, SummarizedDocument, SharedMaterial
 from django.utils import timezone
 from datetime import timedelta
+import re
 
 # Configure Gemini AI
 from decouple import config
-ai_client = genai.Client(api_key=config('GOOGLE_API_KEY', default=''))
+# Note: ai_client is now initialized dynamically inside functions to ensure .env updates are respected.
 
 def extract_text_from_file(file):
     """
@@ -35,29 +36,120 @@ def extract_text_from_file(file):
     return content
 
 def generate_document_summary(text, file_name='Document'):
-    """Generates a structured summary using Gemini AI. Returns (summary_text, title_line)."""
+    """Generates a structured summary using Gemini AI with lazy initialization and smart fallback."""
     if not text:
         return "No content to summarize.", file_name
 
+    # Lazy initialization: Always pull fresh key from .env
+    api_key = config('GOOGLE_API_KEY', default='').strip()
+    if not api_key:
+        return "System Error: Missing AI API Key.", file_name
+    
+    client = genai.Client(api_key=api_key)
+
     try:
+        # Standardized Structural Prompt (Follows USER's 2026-04-09 Guidelines)
         prompt = (
-            f"You are a study assistant. Summarize the following document titled '{file_name}' "
-            f"clearly and concisely for a student. Focus on key concepts, definitions, and important points.\n\n"
-            f"{text[:10000]}"
+            f"Summarize the document '{file_name}' for an academic setting. "
+            "Follow these rules strictly:\n"
+            "1. ACCURACY: Reflect the original meaning without filler or unrelated text.\n"
+            "2. FORMAT: Use clear, concise sentences. Use bullet points for readability. "
+            "   Short text -> 2-3 sentences. Long text -> 5-7 bullet points.\n"
+            "3. CONTENT: Capture the main idea, key arguments, and essential facts. "
+            "   Answer: What is this about? What are the main takeaways?\n"
+            "4. OUTPUT: Provide ONLY the summary. No commentary. "
+            "   End with a one-line 'CORE TAKEAWAY' statement.\n\n"
+            f"TEXT CONTENT:\n{text[:12000]}"
         )
-        response = ai_client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=prompt
-        )
-        summary_text = response.text
-        # Extract a short title from the first line if possible
-        first_line = summary_text.strip().split('\n')[0][:120]
-        title_line = first_line if first_line else file_name
-        return summary_text, title_line
+        # ── Multi-Model Resilient Generation ──
+        models_to_try = [
+            'gemini-2.0-flash',  # High priority (Experimental/New)
+            'gemini-1.5-flash',  # Robust fallback
+            'gemini-small'       # Last resort API-wise
+        ]
+        
+        last_error = "Unknown error"
+        for model_name in models_to_try:
+            try:
+                print(f"DEBUG - Attempting summary with {model_name}...")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                if response and response.text:
+                    summary_text = response.text
+                    first_line = summary_text.strip().split('\n')[0][:80]
+                    title_line = first_line if len(first_line) > 5 else file_name
+                    return summary_text, title_line
+            except Exception as model_err:
+                last_error = str(model_err)
+                print(f"DEBUG - {model_name} failed: {last_error[:100]}")
+                continue # Try next model
+        
+        # If we get here, all models failed (likely 429 or 401)
+        raise Exception(f"All AI models exhausted. Last error: {last_error}")
+
     except Exception as e:
-        print(f"AI Error: {e}")
-        fallback = "The AI was unable to summarize this document at this time."
-        return fallback, file_name
+        import traceback
+        print(f"DEBUG - AI Summary Link Failure: {e}")
+        print(traceback.format_exc())
+        
+        # --- AGGRESSIVE VERTICAL TEXT REPAIR ---
+        # 1. First Pass: Join lines that are likely part of the same sentence
+        raw_lines = text.split('\n')
+        processed_lines = []
+        buffer = []
+        
+        for line in raw_lines:
+            clean = line.strip()
+            if not clean:
+                if buffer:
+                    processed_lines.append(" ".join(buffer))
+                    buffer = []
+                continue
+            
+            # If line is a list item or start of a new section, flush buffer
+            if re.match(r'^(\d+\.|\*|\-|[A-Z][a-z]+:)', clean):
+                if buffer:
+                    processed_lines.append(" ".join(buffer))
+                    buffer = []
+                processed_lines.append(clean)
+            else:
+                # Append to buffer (it's likely a continuation)
+                buffer.append(clean)
+        
+        if buffer:
+            processed_lines.append(" ".join(buffer))
+            
+        # 2. Second Pass: Synthesize into a readable summary format
+        cleaned_text = " ".join(processed_lines)
+        # Fix double spaces and common PDF artifacts
+        cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+        
+        # Extract more meaningful sentences for a deeper overview
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?]) +', cleaned_text) if len(s.strip()) > 15]
+        # Include more sentences to 'capture the thought' (approx 6 sentences)
+        summary_intro = " ".join(sentences[:6]) if sentences else "This document contains extensive academic study material."
+        
+        # Extract up to 10 logical points or numbered items
+        potential_points = []
+        for line in processed_lines:
+            line = line.strip()
+            # Look for numbered items or capital letter headers
+            if len(line) > 10 and (re.match(r'^(\d+\.|\*|\-)', line) or (':' in line and line[:15].isupper())):
+                potential_points.append(line)
+            if len(potential_points) >= 10: break
+
+        points_text = "\n".join([f"• {p}" for p in potential_points]) if potential_points else "• Key focus: Detailed academic review and content extraction."
+
+        fallback = (
+            f"📌 DETAILED SUMMARY OVERVIEW (OFFLINE)\n\n"
+            f"{summary_intro}\n\n"
+            f"🔍 KEY EXTRACTED POINTS:\n"
+            f"{points_text}\n\n"
+            f"CORE TAKEAWAY: Based on the extracted content, this document provides a comprehensive look at {file_name}. Review the sections above for detailed insights."
+        )
+        return fallback, f"Summary: {file_name}"
 
 def calculate_user_metrics(user):
     """Calculates dashboard and progress analytics."""
@@ -122,15 +214,37 @@ def generate_batch_synthesis(doc_ids, user):
     if not combined_text:
         return "No summaries selected."
 
+    # Initialize client dynamically
+    api_key = config('GOOGLE_API_KEY', default='')
+    client = genai.Client(api_key=api_key)
+
     try:
-        prompt = f"Synthesize these individual study summaries into one master study guide:\n\n{combined_text[:10000]}"
-        response = ai_client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=prompt
+        prompt = (
+            "Synthesize these individual study summaries into one master study guide. "
+            "Follow these rules strictly:\n"
+            "1. ACCURACY: Merge content without distortion or filler.\n"
+            "2. FORMAT: Use clear sentences and bullet points. Focus on logical categorization.\n"
+            "3. OUTPUT: Provide ONLY the synthesis. End with a one-line 'CORE TAKEAWAY' for the entire batch.\n\n"
+            f"SUMMARIES:\n{combined_text[:10000]}"
         )
-        return response.text
+        # ── Multi-Model Resilient Synthesis ──
+        models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash']
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                print(f"Batch Synthesis Error with {model_name}: {e}")
+                continue
+        
+        return "⚠️ All individual AI models failed for batch synthesis. Review individual summaries below."
     except Exception as e:
-        return f"Synthesis error: {e}"
+        print(f"Synthesis Error: {e}")
+        return f"⚠️ [Batch Synthesis Unavailable]\n\nThe AI was unable to combine these documents. Please review the individual summaries below.\n\n(Error: {str(e)})"
 
 def search_summarized_documents(user, query):
     """Search for relevant summaries."""

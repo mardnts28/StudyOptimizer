@@ -12,7 +12,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseRedirect
 from django.db.models import Sum, Count, Avg, Q
 from django.db.models.functions import ExtractHour, ExtractWeekDay
 from django.contrib.sessions.models import Session
@@ -962,6 +962,13 @@ def summarize_doc(request):
 
         final_summary, title_line = generate_document_summary(content, file_name)
 
+        # ── Store raw content in Postgres for high availability ──
+        uploaded_file.seek(0)
+        file_content = uploaded_file.read()
+        import mimetypes
+        file_mimetype, _ = mimetypes.guess_type(file_name)
+        uploaded_file.seek(0)
+
         doc = SummarizedDocument.objects.create(
             user          = request.user,
             file_name     = bleach.clean(file_name),
@@ -970,6 +977,8 @@ def summarize_doc(request):
             content_hash  = hashlib.sha256(final_summary.encode('utf-8')).hexdigest(),
             document_file = uploaded_file,
             emoji         = '📄',
+            file_content  = file_content,
+            file_mimetype = file_mimetype,
         )
         AuditLog.objects.create(
             user    = request.user,
@@ -1059,20 +1068,33 @@ def collaborate(request):
 
     # Top contributors (points-based)
     contributors = []
+    # Rank all users who have at least 1 point
     for u in User.objects.all():
         material_count  = SharedMaterial.objects.filter(author=u).count()
         likes_received  = SharedMaterial.objects.filter(author=u).aggregate(total=Count('likes'))['total'] or 0
         comment_count   = Comment.objects.filter(author=u).count()
         completed_tasks = Task.objects.filter(user=u, completed=True).count()
+        
+        # Point System: Materials (10), Likes (5), Comments (2), Tasks (1)
         points = (material_count * 10) + (likes_received * 5) + (comment_count * 2) + completed_tasks
+        
         if points > 0:
             contributors.append({
-                'username': u.username,
-                'initials': u.username[:2].upper(),
-                'points':   points,
-                'materials': material_count,
+                'name':      u.username,
+                'initials':  u.username[:2].upper(),
+                'points':    points,
+                'count':     material_count, # Matches template 'contributor.count'
+                'medal':     '👤' # Default
             })
+    
+    # Sort by points and take top 5
     contributors = sorted(contributors, key=lambda x: x['points'], reverse=True)[:5]
+    
+    # Assign Medals to the top 3
+    medals = ['🥇', '🥈', '🥉']
+    for i, c in enumerate(contributors):
+        if i < len(medals):
+            c['medal'] = medals[i]
 
     return render(request, 'main/collaborate.html', {
         'materials_json':        json.dumps(materials_list),
@@ -1103,6 +1125,15 @@ def share_material(request):
         if not content:
             return JsonResponse({'status': 'error', 'message': 'Content missing.'}, status=400)
 
+        # ── Store raw content in Postgres for high availability ──
+        file_content = None
+        file_mimetype = None
+        if file_obj:
+            import mimetypes
+            file_content = file_obj.read()
+            file_mimetype, _ = mimetypes.guess_type(file_obj.name)
+            file_obj.seek(0) # Reset pointer so Django can still save it to disk/Cloudinary
+
         material = SharedMaterial.objects.create(
             author       = request.user,
             title        = title,
@@ -1112,6 +1143,8 @@ def share_material(request):
             file         = file_obj,
             is_anonymous = is_anon,
             emoji        = '📄',
+            file_content = file_content,
+            file_mimetype = file_mimetype,
         )
         AuditLog.objects.create(
             user    = request.user,
@@ -1386,54 +1419,222 @@ def download_summary_pdf(request, doc_id):
             action  = 'Downloaded PDF Summary',
             details = f'Document ID: {doc_id}',
         )
+        # Calculate sequential number for this user
+        user_summary_count = SummarizedDocument.objects.filter(
+            user=request.user, 
+            created_at__lte=doc_obj.created_at
+        ).count()
+        
+        safe_filename = f"StudyOptimizer_Summary_{user_summary_count:03d}.pdf"
+
         response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition']  = f'attachment; filename="Summary_{doc_id}.pdf"'
+        response['Content-Disposition']  = f'attachment; filename="{safe_filename}"'
         response['Cache-Control']        = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
     except Exception as e:
-        print(f'CRITICAL PDF GEN ERROR: {e}')
-        response = HttpResponse(doc_obj.summary_text, content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="Summary_{doc_id}.txt"'
-        return response
+        print(f"Global Fallback Error: {e}")
+        return HttpResponse("Unable to download this file at the moment. Please try again later.", status=500)
+
+
+@login_required
+def view_shared_file(request, material_id):
+    """Secure Proxy Streamer: Streams the file through the server to ensure iframe compatibility."""
+    import os
+    import requests
+    import mimetypes
+    from django.conf import settings
+    from django.http import StreamingHttpResponse
+    
+    material = get_object_or_404(SharedMaterial, id=material_id)
+    
+    if material.is_removed_by_mod or material.is_hidden:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("This resource has been hidden or removed.")
+
+    # Increment analytics: View Count
+    material.views += 1
+    material.save()
+
+    if material.file:
+        import cloudinary
+        import cloudinary.utils
+        
+        # Explicitly configure cloudinary with the latest settings
+        cl_config = settings.CLOUDINARY_STORAGE
+        if 'CLOUDINARY_URL' in cl_config:
+            cloudinary.config(cloudinary_url=cl_config['CLOUDINARY_URL'], secure=True)
+        else:
+            cloudinary.config(
+                cloud_name=cl_config.get('CLOUD_NAME'),
+                api_key=cl_config.get('API_KEY'),
+                api_secret=cl_config.get('API_SECRET'),
+                secure=True
+            )
+        
+        # Priority 1: Check Local Storage (Development/Fallback)
+        local_path = os.path.join(settings.MEDIA_ROOT, material.file.name)
+        if os.path.exists(local_path):
+            try:
+                content_type, _ = mimetypes.guess_type(local_path)
+                response = HttpResponse(open(local_path, 'rb').read(), content_type=content_type or 'application/pdf')
+                response['Content-Disposition'] = 'inline'
+                response['X-Frame-Options'] = 'SAMEORIGIN'
+                return response
+            except Exception as e:
+                print(f"Local Proxy failed: {e}")
+
+        # Priority 2: Postgres Binary Storage (Ultra-Reliable - FIXES "Blocked Access")
+        if material.file_content:
+            try:
+                response = HttpResponse(material.file_content, content_type=material.file_mimetype or 'application/pdf')
+                response['Content-Disposition'] = 'inline'
+                response['X-Frame-Options'] = 'SAMEORIGIN' # Better than ALLOWALL
+                return response
+            except Exception as e:
+                print(f"Postgres storage serve failed: {e}")
+
+        # Priority 3: Proxy Stream with Robust Signed URL (Cloudinary)
+        try:
+            # Cloudinary public_ids for raw files often include the path
+            # We need to ensure we don't have redundant 'media/' prefixes
+            raw_path = material.file.name
+            if raw_path.startswith('media/'):
+                raw_path = raw_path.replace('media/', '', 1)
+            
+            # 1. Try with the relative path (Standard)
+            signed_url, _ = cloudinary.utils.cloudinary_url(
+                raw_path,
+                sign_url=True,
+                resource_type="raw",
+                secure=True,
+                type="upload"
+            )
+
+            print(f"DEBUG - Accessing Shared Resource: {raw_path}")
+            
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'}
+            cl_resp = requests.get(signed_url, stream=True, timeout=15, headers=headers)
+            
+            # 2. Fallback: Try with the 'studyoptimizer/' prefix (User's specific setup)
+            if cl_resp.status_code != 200:
+                print(f"DEBUG - Standard path failed ({cl_resp.status_code}). Trying studyoptimizer prefix...")
+                prefix_path = f"studyoptimizer/{raw_path}"
+                signed_url, _ = cloudinary.utils.cloudinary_url(
+                    prefix_path,
+                    sign_url=True,
+                    resource_type="raw",
+                    secure=True,
+                    type="upload"
+                )
+                cl_resp = requests.get(signed_url, stream=True, timeout=10, headers=headers)
+
+            # 3. Last Resort Fallback: Try with absolute path
+            if cl_resp.status_code != 200:
+                abs_path = "media/" + raw_path if not raw_path.startswith('media/') else raw_path
+                signed_url, _ = cloudinary.utils.cloudinary_url(abs_path, sign_url=True, resource_type="raw", secure=True, type="upload")
+                cl_resp = requests.get(signed_url, stream=True, timeout=10, headers=headers)
+
+            if cl_resp.status_code == 200:
+                content_type = cl_resp.headers.get('content-type', 'application/pdf')
+                response = StreamingHttpResponse(cl_resp.iter_content(chunk_size=8192), content_type=content_type)
+                response['Content-Disposition'] = 'inline'
+                response['X-Frame-Options'] = 'ALLOWALL' 
+                return response
+
+            return HttpResponse(f"Access Error: {cl_resp.status_code}. The file might be in a different Cloudinary folder.", status=cl_resp.status_code)
+
+        except Exception as e:
+            print(f"Cloudinary Signed Proxy failed: {e}")
+            return HttpResponse(f"Stream Error: {str(e)}", status=500)
+            return HttpResponse("Problem processing the file stream.", status=500)
+
+    return HttpResponse("This resource does not have an active file.", status=404)
 
 
 @login_required
 def download_shared_pdf(request, material_id):
+    """
+    Downloads the shared content. 
+    1. If an original file was uploaded, serves that file.
+    2. Otherwise, generates a PDF from the text content.
+    """
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-
-    material = get_object_or_404(SharedMaterial, id=material_id)
-    
-    # Permission Check (STRIDE - Information Disclosure)
-    if material.is_hidden and not (request.user.is_staff or request.user == material.author):
-        from django.core.exceptions import PermissionDenied
-        raise PermissionDenied("This resource has been hidden by a moderator.")
-    buffer   = io.BytesIO()
-    pdf_doc  = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
-    styles   = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        'TitleStyle', parent=styles['Heading1'],
-        fontSize=22, textColor=colors.HexColor('#8C1007'),
-        alignment=1, spaceAfter=20, fontName='Helvetica-Bold',
-    )
-    body_style = ParagraphStyle(
-        'BodyStyle', parent=styles['Normal'],
-        fontSize=11, leading=14, fontName='Helvetica', alignment=4,
-    )
-
-    emo_regex    = r'[\U00010000-\U0010ffff]'
-    clean_title  = re.sub(emo_regex, '', material.title).strip()
-    text_content = re.sub(emo_regex, '', material.content)
-    text_content = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text_content)
-
-    def safe_text(txt):
-        return re.sub(r'[^\x00-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2022]', '', txt or '')
+    from django.http import HttpResponse, HttpResponseRedirect
 
     try:
+        material = get_object_or_404(SharedMaterial, id=material_id)
+        
+        # Permission Check
+        if material.is_hidden and not (request.user.is_staff or request.user == material.author):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("This resource has been hidden by a moderator.")
+
+        # 1. If an original file exists, try local then Cloudinary
+        if material.file:
+            import os
+            from django.conf import settings
+            local_path = os.path.join(settings.MEDIA_ROOT, material.file.name)
+            
+            # Use local file if it exists (Fixes the 'not viewable' issue for existing local files)
+            if os.path.exists(local_path):
+                try:
+                    import mimetypes
+                    content_type, _ = mimetypes.guess_type(local_path)
+                    with open(local_path, 'rb') as f:
+                        response = HttpResponse(f.read(), content_type=content_type or 'application/octet-stream')
+                        response['Content-Disposition'] = f'attachment; filename="{os.path.basename(local_path)}"'
+                        return response
+                except Exception as e:
+                    print(f"Local download failed: {e}")
+
+            # ── Postgres Binary Download Fallback ──
+            if material.file_content:
+                try:
+                    import os
+                    filename = os.path.basename(material.file.name)
+                    response = HttpResponse(material.file_content, content_type=material.file_mimetype or 'application/octet-stream')
+                    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                    return response
+                except Exception as e:
+                    print(f"Postgres download failed: {e}")
+
+            try:
+                url = material.file.url
+                # Clean up redundant 'media/' prefixes
+                if '/media/media/' in url:
+                    url = url.replace('/media/media/', '/media/')
+                return HttpResponseRedirect(url)
+            except Exception as e:
+                print(f"Direct file serving failed: {e}")
+                return HttpResponse("Problem accessing the file.", status=500)
+
+        # 2. Generate PDF from text content...
+        buffer = io.BytesIO()
+        pdf_doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            'TitleStyle', parent=styles['Heading1'],
+            fontSize=22, textColor=colors.HexColor('#8C1007'),
+            alignment=1, spaceAfter=20, fontName='Helvetica-Bold',
+        )
+        body_style = ParagraphStyle(
+            'BodyStyle', parent=styles['Normal'],
+            fontSize=11, leading=14, fontName='Helvetica', alignment=4,
+        )
+
+        emo_regex = r'[\U00010000-\U0010ffff]'
+        clean_title = re.sub(emo_regex, '', material.title).strip()
+        text_content = re.sub(emo_regex, '', material.content)
+        text_content = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text_content)
+
+        def safe_text(txt):
+            return re.sub(r'[^\x00-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2022]', '', txt or '')
+
         elements = [
             Paragraph(f'<b>Community Resource: {safe_text(clean_title)}</b>', title_style),
             Paragraph(
@@ -1442,10 +1643,10 @@ def download_shared_pdf(request, material_id):
             ),
             Spacer(1, 20),
         ]
+        
         for p_text in text_content.split('\n'):
             p_text = safe_text(p_text.strip())
-            if not p_text:
-                continue
+            if not p_text: continue
             p_text = p_text.replace('<', '&lt;').replace('>', '&gt;')
             p_text = p_text.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
             if p_text.startswith(('- ', '* ')) or re.match(r'^\d+\.', p_text):
@@ -1464,10 +1665,15 @@ def download_shared_pdf(request, material_id):
         return response
 
     except Exception as e:
-        print(f'SHARED PDF GEN ERROR: {e}')
-        response = HttpResponse(material.content, content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="Shared_{material_id}.txt"'
-        return response
+        print(f'CRITICAL DOWNLOAD ERROR: {e}')
+        # Extreme Fallback: If everything fails, return the text as a TXT file
+        try:
+            material = SharedMaterial.objects.get(id=material_id)
+            response = HttpResponse(material.content, content_type='text/plain')
+            response['Content-Disposition'] = f'attachment; filename="Summary_{material_id}.txt"'
+            return response
+        except:
+            return HttpResponse(f"Download Error: {str(e)}", status=500)
 
 
 # ── USER — SEARCH ─────────────────────────────────────────────────────────────

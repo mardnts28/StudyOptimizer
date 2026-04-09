@@ -59,7 +59,33 @@
                         <span class="text-lg">📄</span>
                     </div>
 
-                    <div class="p-8">
+                    <div class="relative p-8">
+                        <!-- ── Premium Loading Overlay ── -->
+                        <template x-if="isProcessing">
+                            <div class="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center transition-all duration-500">
+                                <div class="relative w-24 h-24 mb-6">
+                                    <!-- Orbiting circles animation -->
+                                    <div class="absolute inset-0 border-4 border-red-100 rounded-full"></div>
+                                    <div class="absolute inset-0 border-4 border-t-[#8C1007] rounded-full animate-spin"></div>
+                                    <div class="absolute inset-4 border-4 border-b-[#A8100C] rounded-full animate-spin-reverse opacity-60"></div>
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <i data-lucide="cpu" class="w-8 h-8 text-[#8C1007] animate-pulse"></i>
+                                    </div>
+                                </div>
+                                
+                                <h3 class="text-2xl font-black text-gray-900 mb-2">Analyzing Knowledge...</h3>
+                                <p class="text-[#8C1007] font-bold text-sm tracking-widest uppercase mb-6" 
+                                   x-text="'Processing ' + currentFileIndex + ' of ' + selectedFiles.length"></p>
+                                
+                                <div class="space-y-4 max-w-sm">
+                                    <div class="flex items-center gap-3 text-left p-4 bg-red-50 rounded-2xl border border-red-100">
+                                        <div class="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                                        <p class="text-xs text-red-800 font-bold leading-relaxed" x-text="loadingSubtext"></p>
+                                    </div>
+                                    <p class="text-[10px] text-gray-400 font-medium italic">Gemini AI is deep-diving into your notes. This usually takes 5-8 seconds.</p>
+                                </div>
+                            </div>
+                        </template>
                         <form @submit.prevent="handleSubmit" class="space-y-8">
                             <!-- Drop Zone -->
                             <div>
@@ -237,6 +263,28 @@
                 title: '',
                 errorMessage: '',
                 recentSummaries: initialData,
+                loadingSubtext: 'Extracting key concepts...',
+                subtextInterval: null,
+
+                initSubtext() {
+                    const messages = [
+                        'Extracting key concepts...',
+                        'Consulting with Gemini AI...',
+                        'Structuring your study guide...',
+                        'Synthesizing data points...',
+                        'Polishing the core takeaways...',
+                        'Optimizing for better retention...'
+                    ];
+                    let i = 0;
+                    this.subtextInterval = setInterval(() => {
+                        i = (i + 1) % messages.length;
+                        this.loadingSubtext = messages[i];
+                    }, 2000);
+                },
+
+                stopSubtext() {
+                    if (this.subtextInterval) clearInterval(this.subtextInterval);
+                },
 
                 formatSummary(text) {
                     if (!text) return '';
@@ -297,6 +345,7 @@
                     if (this.selectedFiles.length === 0) return;
                     
                     this.isProcessing = true;
+                    this.initSubtext();
                     this.summary = '';
                     this.title = '';
                     this.errorMessage = '';
@@ -413,6 +462,7 @@
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                     this.isProcessing = false;
+                    this.stopSubtext();
                     this.$nextTick(() => { if(window.lucide) lucide.createIcons() });
                 },
                 
@@ -445,6 +495,14 @@
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #fca5a5;
+        }
+
+        @keyframes spin-reverse {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+        }
+        .animate-spin-reverse {
+            animation: spin-reverse 1s linear infinite;
         }
     </style>
 </body>
