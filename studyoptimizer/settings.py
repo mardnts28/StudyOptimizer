@@ -280,6 +280,14 @@ if not IS_LOCAL:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # Static files resilience
+    WHITENOISE_MANIFEST_STRICT = False
+    
+    # Security Middleware (Axes) settings for smoother admin access
+    AXES_ONLY_USER_FAILURES = True
+    AXES_RESET_ON_SUCCESS = True
+    AXES_LOCKOUT_TEMPLATE = None # Use default or custom
 else:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
