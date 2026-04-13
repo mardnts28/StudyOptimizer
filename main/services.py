@@ -83,7 +83,7 @@ def generate_document_summary(text, file_name='Document', file_mimetype='applica
             "3. ZERO space between ANY header and its output (Start content on the immediate NEXT line).\n"
             "4. For Three-Part Breakdown, always BOLD the category title before the colon: '1. <b>Title:</b> description'.\n"
             "5. Executive Highlights MUST be a numbered list (1., 2.).\n"
-            f"TEXT CONTENT:\n{text[:12000]}"
+            f"TEXT CONTENT:\n{text[:8000]}"
         )
         
         # Standard fallback logic for model names
@@ -258,7 +258,7 @@ def generate_batch_synthesis(doc_ids, user):
             "4. Add a SPACE after 'Summary of:' before the content.\n"
             "5. For Three-Part Breakdown, BOLD the section titles before the colon.\n"
             "6. Executive Highlights must be a numbered list.\n\n"
-            f"DATA:\n{combined_text[:12000]}"
+            f"DATA:\n{combined_text[:8000]}"
         )
         
         models_to_try = [

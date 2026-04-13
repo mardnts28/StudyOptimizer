@@ -1,1 +1,1 @@
-web: gunicorn studyoptimizer.wsgi --log-file - --workers 2 --timeout 120 --worker-tmp-dir /dev/shm
+web: gunicorn studyoptimizer.wsgi --log-file - --workers 1 --timeout 120 --worker-tmp-dir /dev/shm
