@@ -127,6 +127,9 @@
                                       :style="getPriorityStyle(task.priority)"
                                       x-text="task.priority"></span>
                                 <span class="text-gray-500 font-medium" x-text="'📅 ' + task.dueDate"></span>
+                                <template x-if="task.subject">
+                                    <span class="px-3 py-1 bg-gray-50 text-gray-400 rounded-full font-bold border-2 border-gray-100" x-text="'# ' + task.subject"></span>
+                                </template>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -171,6 +174,11 @@
                     <div>
                         <label class="block text-sm font-semibold mb-1.5 text-gray-700">Task Title</label>
                         <input x-model="newTask.title" type="text" placeholder="What needs to be done?"
+                               class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-gray-900 outline-none transition-colors text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1.5 text-gray-700">Subject</label>
+                        <input x-model="newTask.subject" type="text" placeholder="e.g. Math, Science, IT"
                                class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-gray-900 outline-none transition-colors text-sm">
                     </div>
                     <div>
@@ -264,7 +272,7 @@
                 isEditMode: false,
                 currentTaskId: null,
                 taskToDelete: null,
-                newTask: { title: '', period: 'General', priority: '', dueDate: '' },
+                newTask: { title: '', subject: 'General', period: 'General', priority: '', dueDate: '' },
                 tasks: JSON.parse('{{ tasks_data|safe }}'),
 
                 activeTasks()    { return this.tasks.filter(t => !t.completed); },
@@ -355,7 +363,7 @@
                 resetForm() {
                     this.isEditMode    = false;
                     this.currentTaskId = null;
-                    this.newTask       = { title: '', period: 'General', priority: '', dueDate: '' };
+                    this.newTask       = { title: '', subject: 'General', period: 'General', priority: '', dueDate: '' };
                 },
 
                 getPriorityStyle(priority) {
