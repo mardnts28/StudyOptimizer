@@ -215,16 +215,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 CLOUDINARY_URL = config('CLOUDINARY_URL', default='')
 CL_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
 
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.RawMediaCloudinaryStorage" if (CLOUDINARY_URL or CL_NAME) else "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 if CLOUDINARY_URL or CL_NAME:
-    STORAGES = {
-        "default": {
-            "BACKEND": "cloudinary_storage.storage.RawMediaCloudinaryStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
-    }
-    
     # Legacy compatibility for django-cloudinary-storage
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.RawMediaCloudinaryStorage"
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
