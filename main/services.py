@@ -75,7 +75,8 @@ def generate_document_summary(text, file_name='Document', file_mimetype='applica
             "[What to study next or how this applies to the course]\n\n"
             "💡 <b>Takeaway</b>\n"
             "[One final profound concluding thought]\n\n"
-            "Follow these rules strictly: Use HTML tags (<b>, <ul>, <li>) for formatting. No introductory banter. "
+            "RULES: Use HTML tags (<b>, <ul>, <li>) ONLY. Use EXACTLY one empty line between sections. "
+            "Ensure paragraphs are justified in meaning. No introductory banter. "
             f"TEXT CONTENT:\n{text[:12000]}"
         )
         
@@ -221,10 +222,11 @@ def generate_batch_synthesis(doc_ids, user):
     if not summaries_qs.exists():
         return "No summaries selected."
 
-    # Build the collective text with file names
+    # Build the collective text with file names and dividers
     numbered_summaries = []
     for i, s in enumerate(summaries_qs, 1):
-        numbered_summaries.append(f"--- FILE {i}: {s.file_name} ---\n{s.summary_text}")
+        divider = "<hr style='border: 0; border-top: 2px solid #F3F4F6; margin: 30px 0;'>\n" if i > 1 else ""
+        numbered_summaries.append(f"{divider}--- FILE {i}: {s.file_name} ---\n{s.summary_text}")
     
     combined_text = "\n\n".join(numbered_summaries)
 
