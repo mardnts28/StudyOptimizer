@@ -20,13 +20,17 @@ def extract_text_from_file(file):
         if extension == 'pdf':
             import PyPDF2
             reader = PyPDF2.PdfReader(file)
-            for page in reader.pages:
-                text = page.extract_text()
+            # Limit to first 15 pages to save memory
+            page_limit = min(len(reader.pages), 15)
+            for i in range(page_limit):
+                text = reader.pages[i].extract_text()
                 if text:
                     content += text + "\n"
+                if len(content) > 50000: break # Hard cap at 50k chars
         elif extension in ['docx', 'doc']:
             import docx2txt
             content = docx2txt.process(file)
+            if len(content) > 50000: content = content[:50000]
         else:
             # Try utf-8 first
             try:
@@ -34,6 +38,7 @@ def extract_text_from_file(file):
             except:
                 file.seek(0)
                 content = file.read().decode('latin-1', errors='ignore')
+            if len(content) > 50000: content = content[:50000]
     except Exception as e:
         print(f"Extraction error: {e}")
         return ""
