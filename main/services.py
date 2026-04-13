@@ -64,9 +64,9 @@ def generate_document_summary(text, file_name='Document'):
         )
         # ── Multi-Model Resilient Generation ──
         models_to_try = [
-            'gemini-2.0-flash',  # High priority (Experimental/New)
-            'gemini-1.5-flash',  # Robust fallback
-            'gemini-small'       # Last resort API-wise
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-flash-latest'
         ]
         
         last_error = "Unknown error"
