@@ -6,7 +6,7 @@ from decouple import config
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from datetime import timedelta
-from .models import Task, SummarizedDocument, SharedMaterial
+from .models import Task, SummarizedDocument, SharedMaterial, Quiz
 
 def extract_text_from_file(file):
     """
@@ -116,6 +116,45 @@ def validate_content_quality(text, file_name):
     except Exception as e:
         print(f"Critical Validation Failure: {e}")
         return True, "", "General"
+
+def validate_learning_reflection(reflection, task_title):
+    """
+    Screens for meaningful learning progress. 
+    Allows short but substantive feedback. Rejects filler.
+    """
+    if not reflection or len(reflection.strip()) < 15:
+        return False, "Your reflection is too short. Please share one specific thing you learned."
+
+    api_key = config('GOOGLE_API_KEY', default='').strip()
+    if not api_key:
+        return True, "" # Skip validation if no API key
+    
+    client = genai.Client(api_key=api_key)
+    
+    prompt = (
+        f"You are a Teacher checking a student's study reflection for the task: '{task_title}'.\n"
+        "Evaluate if the student shared a meaningful or relevant takeaway.\n\n"
+        "REJECT:\n"
+        "- Generic filler like 'I learned a lot', 'Done', 'Asdasdasd', 'Test'.\n"
+        "- Meta-comments like 'I am just doing this for the badge'.\n\n"
+        "ACCEPT:\n"
+        "- Any specific detail, concept, or summary of work done, even if informal.\n\n"
+        f"STUDENT REFLECTION:\n{reflection}\n\n"
+        "Respond ONLY with a JSON object: {\"is_valid\": boolean, \"reason\": \"string\"}"
+    )
+
+    try:
+        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        if match:
+            data = json.loads(match.group())
+            is_valid = data.get('is_valid', True)
+            reason = data.get('reason', "Please provide a more educational takeaway.")
+            return is_valid, reason
+    except:
+        pass
+    
+    return True, "" # Fallback to success on API error
 
 def generate_document_summary(text, file_name='Document', file_mimetype='application/octet-stream'):
     """Generates a structured summary using Gemini AI with lazy initialization and smart fallback."""
@@ -249,7 +288,10 @@ def calculate_user_metrics(user):
     # 1. Basic Stats
     tasks_all       = Task.objects.filter(user=user)
     completed_tasks = tasks_all.filter(completed=True).count()
-    summaries_count = SummarizedDocument.objects.filter(user=user).count()
+    verified_tasks  = tasks_all.filter(completed=True).exclude(reflection__isnull=True).exclude(reflection='').count()
+    
+    summaries_count  = SummarizedDocument.objects.filter(user=user).count()
+    mastered_quizzes = Quiz.objects.filter(user=user, is_mastered=True).count()
 
     # 2. Level Calculation
     user_level = (completed_tasks // 5) + 1
@@ -280,6 +322,12 @@ def calculate_user_metrics(user):
     subject_labels = [s['subject'] or 'General' for s in subject_qs]
     subject_data   = [s['count'] for s in subject_qs]
 
+    # 6. Special Habits
+    # Night Owl: Completed a task between 10pm and 4am
+    is_night_owl = tasks_all.filter(completed=True).filter(
+        Q(completed_at__hour__gte=22) | Q(completed_at__hour__lt=4)
+    ).exists()
+
     total = tasks_all.count()
     return {
         'user_level':          user_level,
@@ -294,6 +342,9 @@ def calculate_user_metrics(user):
         'weekly_hours_trend':  weekly_hours_trend,
         'subject_labels':      subject_labels,
         'subject_data':        subject_data,
+        'verified_count':      verified_tasks,
+        'mastered_count':      mastered_quizzes,
+        'is_night_owl':        is_night_owl,
     }
 
 def generate_batch_synthesis(doc_ids, user):

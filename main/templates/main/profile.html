@@ -8,6 +8,21 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #FDE68A;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-white via-blue-50/20 to-white min-h-screen">
     <nav class="sticky top-0 z-50 bg-white border-b border-gray-100">
@@ -168,22 +183,23 @@
                             <span class="text-lg">🏆</span>
                         </div>
                     </div>
-                    <div class="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <div class="p-4 rounded-2xl border-2 border-yellow-100 bg-yellow-50 text-center">
-                            <div class="text-3xl mb-1">🌱</div>
-                            <div class="text-xs font-bold text-yellow-800">Seedling</div>
-                            <div class="text-[10px] text-yellow-600">Joined the lab</div>
-                        </div>
-                        <div class="p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-center opacity-50">
-                            <div class="text-3xl mb-1 grayscale">🦉</div>
-                            <div class="text-xs font-bold text-gray-800">Night Owl</div>
-                            <div class="text-[10px] text-gray-600">Study late (Locked)</div>
-                        </div>
-                        <div class="p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-center opacity-50">
-                            <div class="text-3xl mb-1 grayscale">🌋</div>
-                            <div class="text-xs font-bold text-gray-800">Volcano</div>
-                            <div class="text-[10px] text-gray-600">10 Summaries (Locked)</div>
-                        </div>
+                    <div class="p-4 grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[350px] overflow-y-auto custom-scrollbar pr-2">
+                        <template x-for="achievement in achievements" :key="achievement.title">
+                            <div :class="achievement.unlocked ? 'bg-white border-2 hover:shadow-lg hover:-translate-y-0.5' : 'bg-gray-50 border-2 border-gray-100 opacity-60'" 
+                                 :style="achievement.unlocked ? `border-color: ${achievement.color}` : ''"
+                                 class="p-4 rounded-xl border-2 transition-all text-center relative overflow-hidden group">
+                                
+                                <template x-if="achievement.tierName">
+                                    <div class="absolute top-0 right-0 px-2 py-0.5 text-[8px] font-black tracking-widest text-white rotate-0"
+                                         :style="`background-color: ${achievement.color}`"
+                                         x-text="achievement.tierName"></div>
+                                </template>
+
+                                <div :class="achievement.unlocked ? 'animate-in zoom-in duration-500' : 'grayscale'" class="text-3xl mb-1" x-text="achievement.emoji"></div>
+                                <div class="font-bold text-[13px] text-gray-900" x-text="achievement.title"></div>
+                                <div class="text-[10px] text-gray-600" x-text="achievement.description"></div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -310,8 +326,38 @@
         });
         function profileApp() {
             return {
+                achievements: [],
                 init() {
-                    // Alpine init
+                    this.achievements = [
+                        this.createTieredBadge('Seedling', 'Joined the lab!', '🌱', 1, 1, 1, 1, '#10B981'),
+                        this.createTieredBadge('Deep Thinker', 'Verified Tasks', '🧠', {{ verified_count }}, 1, 10, 50, '#8B5CF6'),
+                        this.createTieredBadge('Knowledge Seeker', 'Quiz Mastery', '🏹', {{ mastered_count }}, 1, 5, 20, '#F59E0B'),
+                        this.createTieredBadge('Volcano', 'Doc Summaries', '🌋', {{ docs_count }}, 10, 50, 100, '#EF4444'),
+                        this.createTieredBadge('Night Owl', 'Late Study', '🦉', {{ is_night_owl|yesno:"1,0" }}, 1, 1, 1, '#6366F1'),
+                    ];
+                    if(window.lucide) { lucide.createIcons(); }
+                },
+                createTieredBadge(title, desc, emoji, current, b, s, g, defaultColor) {
+                    let tier = 0;
+                    let nextGoal = b;
+                    let tierName = '';
+                    let color = '#94a3b8';
+                    
+                    if (current >= g) { tier = 3; tierName = 'GOLD'; nextGoal = g; color = '#fbbf24'; }
+                    else if (current >= s) { tier = 2; tierName = 'SILVER'; nextGoal = g; color = '#94a3b8'; }
+                    else if (current >= b) { tier = 1; tierName = 'BRONZE'; nextGoal = s; color = '#b45309'; }
+
+                    const unlocked = current >= b;
+                    return {
+                        title,
+                        description: desc,
+                        emoji,
+                        unlocked,
+                        tier,
+                        tierName,
+                        color: unlocked ? color : '#cbd5e1',
+                        percent: Math.min((current/nextGoal)*100, 100)
+                    };
                 }
             }
         }

@@ -54,6 +54,7 @@ from .services import (
     search_summarized_documents,
     chat_with_summary,
     generate_quiz_from_summary,
+    validate_learning_reflection,
 )
 from .utils import send_security_alert
 
@@ -980,9 +981,27 @@ def delete_task(request, task_id):
 def toggle_task(request, task_id):
     try:
         task           = Task.objects.get(id=task_id, user=request.user)
-        task.completed = not task.completed
-        # Stamp completion time (drives peak-hour / most-productive-day analytics)
-        task.completed_at = timezone.now() if task.completed else None
+        data = json.loads(request.body or '{}')
+        reflection = data.get('reflection', '').strip()
+
+        # Logic: If turning from incomplete -> complete, require reflection
+        if not task.completed:
+            if not reflection:
+                return JsonResponse({'status': 'error', 'message': 'A reflection is required to complete this task.'}, status=400)
+            
+            # AI Validation of reflection
+            is_valid, ai_reason = validate_learning_reflection(reflection, task.title)
+            if not is_valid:
+                return JsonResponse({'status': 'error', 'message': ai_reason}, status=400)
+            
+            task.reflection = reflection
+            task.completed = True
+            task.completed_at = timezone.now()
+        else:
+            # Toggling back to incomplete (uncheck)
+            task.completed = False
+            task.completed_at = None
+
         task.save()
         return JsonResponse({'status': 'success', 'completed': task.completed})
     except Task.DoesNotExist:
@@ -1181,11 +1200,16 @@ def save_quiz(request):
             
         doc = get_object_or_404(SummarizedDocument, id=doc_id, user=request.user)
         
+        score = data.get('score', 0)
+        is_mastered = score >= 80
+
         quiz = Quiz.objects.create(
             user=request.user,
             document=doc,
             title=title,
-            questions=quiz_questions
+            questions=quiz_questions,
+            score=score,
+            is_mastered=is_mastered
         )
         
         log_action(request.user, "Quiz Saved", f"Quiz ID: {quiz.id}", request)

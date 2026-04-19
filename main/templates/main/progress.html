@@ -9,6 +9,21 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #FDE68A;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-white via-purple-50/20 to-white min-h-screen">
     <nav class="sticky top-0 z-50 bg-white border-b border-gray-100">
@@ -68,15 +83,15 @@
             <div class="relative">
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <div class="text-sm font-medium text-purple-100 mb-1">Your Progress Level</div>
-                        <div class="text-3xl font-bold" x-text="'Level ' + Math.floor({{ completed_count }} / 5 + 1) + ' - Rising Star ⭐'"></div>
+                        <div class="text-sm font-medium text-purple-100 mb-1">Your Learning Level</div>
+                        <div class="text-3xl font-bold" x-text="'Level ' + Math.floor({{ verified_count }} / 5 + 1) + ' - Academic Scholar 🎓'"></div>
                     </div>
                     <div class="text-5xl">🚀</div>
                 </div>
                 <div class="bg-white/20 rounded-full h-4 overflow-hidden backdrop-blur-sm">
-                    <div class="bg-white h-full rounded-full transition-all duration-1000" :style="'width: ' + (({{ completed_count }} % 5) / 5 * 100) + '%'"></div>
+                    <div class="bg-white h-full rounded-full transition-all duration-1000" :style="'width: ' + (({{ verified_count }} % 5) / 5 * 100) + '%'"></div>
                 </div>
-                <div class="mt-2 text-sm text-purple-100" x-text="(5 - ({{ completed_count }} % 5)) + ' more tasks to next level! 🎯'"></div>
+                <div class="mt-2 text-sm text-purple-100" x-text="(5 - ({{ verified_count }} % 5)) + ' more verified tasks to next level! 🎯'"></div>
             </div>
         </div>
 
@@ -91,7 +106,7 @@
                     </div>
                 </div>
                 <div class="p-6">
-                    <div style="height: 280px;"><canvas id="hoursChart"></canvas></div>
+                    <div style="height: 200px;"><canvas id="hoursChart"></canvas></div>
                     <div class="mt-4 p-3 bg-green-50 border-2 border-green-200 rounded-xl">
                         <div class="flex items-center gap-2 text-sm font-semibold text-green-700">
                             <i data-lucide="trending-up" class="w-4 h-4"></i>
@@ -102,7 +117,7 @@
             </div>
 
             <!-- Achievements Sidebar -->
-            <div class="bg-gradient-to-br from-yellow-50 to-white rounded-2xl border-2 border-yellow-200 shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-br from-yellow-50 to-white rounded-2xl border-2 border-yellow-200 shadow-xl overflow-hidden flex flex-col">
                 <div class="bg-gradient-to-r from-yellow-100 to-orange-100 border-b-2 border-yellow-200 p-6">
                     <div class="flex items-center gap-2">
                         <i data-lucide="trophy" class="w-5 h-5 text-yellow-600"></i>
@@ -110,17 +125,53 @@
                         <span class="text-lg">🏆</span>
                     </div>
                 </div>
-                <div class="p-4">
-                    <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                        <template x-for="achievement in achievements" :key="achievement.id">
-                            <div :class="achievement.unlocked ? 'bg-white border-yellow-300 shadow-md hover:shadow-lg hover:-translate-y-0.5' : 'bg-gray-50 border-gray-200 opacity-60'" class="p-4 rounded-xl border-2 transition-all">
-                                <div class="flex items-center gap-3">
-                                    <div :class="achievement.unlocked ? 'animate-bounce' : 'grayscale'" class="text-3xl" x-text="achievement.emoji"></div>
+                <div class="p-4 flex-1">
+                    <div class="space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
+                        <template x-for="achievement in achievements" :key="achievement.title">
+                            <div :class="achievement.unlocked ? 'bg-white border-2' : 'bg-gray-50 border-2 border-gray-100 opacity-60'" 
+                                 :style="achievement.unlocked ? `border-color: ${achievement.color}` : ''"
+                                 class="p-4 rounded-2xl transition-all relative overflow-hidden group">
+                                
+                                <!-- Tier Badge Overlay -->
+                                <template x-if="achievement.unlocked && achievement.tier > 1">
+                                    <div class="absolute top-0 right-0 px-2 py-0.5 text-[8px] font-black tracking-widest text-white shadow-sm"
+                                         :style="`background-color: ${achievement.color}`"
+                                         x-text="'TIER ' + achievement.tier"></div>
+                                </template>
+
+                                <div class="flex items-center gap-4">
+                                    <div :class="achievement.unlocked ? 'animate-in zoom-in duration-500' : 'grayscale'" 
+                                         class="text-4xl filter drop-shadow-sm" 
+                                         x-text="achievement.emoji"></div>
                                     <div class="flex-1">
-                                        <div class="font-bold text-sm text-gray-900" x-text="achievement.title"></div>
-                                        <div class="text-xs text-gray-600" x-text="achievement.description"></div>
-                                        <template x-if="achievement.unlocked">
-                                            <div class="text-xs font-bold text-yellow-600 mt-1">Unlocked! ✨</div>
+                                        <div class="flex items-center gap-2">
+                                            <div class="font-bold text-sm text-gray-900" x-text="achievement.title"></div>
+                                            <template x-if="achievement.tierName">
+                                                <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md" 
+                                                      :style="`background-color: ${achievement.color}15; color: ${achievement.color}`"
+                                                      x-text="achievement.tierName"></span>
+                                            </template>
+                                        </div>
+                                        <div class="text-[11px] text-gray-500 font-medium leading-tight mt-0.5" x-text="achievement.description"></div>
+                                        
+                                        <!-- Progress Bar for next tier -->
+                                        <template x-if="!achievement.isMaxed">
+                                            <div class="mt-3">
+                                                <div class="flex justify-between text-[9px] font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                                                    <span x-text="achievement.progressLabel"></span>
+                                                    <span x-text="Math.floor(achievement.percent) + '%'"></span>
+                                                </div>
+                                                <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div class="h-full rounded-full transition-all duration-1000" 
+                                                         :style="`width: ${achievement.percent}%; background-color: ${achievement.color}`"></div>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="achievement.isMaxed">
+                                            <div class="mt-2 text-[10px] font-black text-green-600 flex items-center gap-1">
+                                                <i data-lucide="check-circle-2" class="w-3 h-3"></i>
+                                                ULTIMATE MASTERY ACHIEVED
+                                            </div>
                                         </template>
                                     </div>
                                 </div>
@@ -169,15 +220,42 @@
                     { label: 'Goals Hit', value: '{{ completed_count }}/{{ total_tasks }}', icon: 'target', color: '#660B05', emoji: '🎯' },
                     { label: 'Completion', value: '{{ completion_rate }}%', icon: 'award', color: '#3E0703', emoji: '⭐' },
                 ],
-                achievements: [
-                    { id: 1, title: 'Study Starter', description: 'Complete your first task!', emoji: '🌱', unlocked: {{ completed_count }} >= 1 },
-                    { id: 2, title: '7-Day Streak', description: 'Studied for a week straight!', emoji: '🔥', unlocked: {{ streak }} >= 7 },
-                    { id: 3, title: 'Early Bird', description: 'Complete 10 tasks!', emoji: '🐦', unlocked: {{ completed_count }} >= 10 },
-                    { id: 4, title: 'Speed Learner', description: 'Summarize 5 documents!', emoji: '⚡', unlocked: {{ summaries_count }} >= 5 },
-                    { id: 5, title: 'Task Master', description: 'Complete 25 tasks!', emoji: '🏆', unlocked: {{ completed_count }} >= 25 },
-                ],
+                achievements: [],
+                createTieredBadge(title, desc, emoji, current, b, s, g, defaultColor) {
+                    let tier = 0;
+                    let nextGoal = b;
+                    let tierName = '';
+                    let color = '#94a3b8'; // Locked gray
+                    
+                    if (current >= g) { tier = 3; tierName = 'GOLD'; nextGoal = g; color = '#fbbf24'; }
+                    else if (current >= s) { tier = 2; tierName = 'SILVER'; nextGoal = g; color = '#94a3b8'; }
+                    else if (current >= b) { tier = 1; tierName = 'BRONZE'; nextGoal = s; color = '#b45309'; }
+
+                    const unlocked = current >= b;
+                    if (!unlocked) color = '#cbd5e1';
+
+                    return {
+                        title,
+                        description: desc,
+                        emoji,
+                        unlocked,
+                        tier,
+                        tierName,
+                        color: unlocked ? color : '#cbd5e1',
+                        percent: Math.min((current / nextGoal) * 100, 100),
+                        progressLabel: unlocked ? (tier === 3 ? 'Max Level' : `Next: ${nextGoal}`) : `Target: ${b}`,
+                        isMaxed: tier === 3
+                    };
+                },
                 categoryStats: JSON.parse('{{ category_stats_json|safe }}'),
                 initCharts() {
+                    this.achievements = [
+                        this.createTieredBadge('Seedling', 'Joined the lab!', '🌱', 1, 1, 1, 1, '#10B981'),
+                        this.createTieredBadge('Deep Thinker', 'Verified Tasks', '🧠', {{ verified_count }}, 1, 10, 50, '#8B5CF6'),
+                        this.createTieredBadge('Knowledge Seeker', 'Quiz Mastery', '🏹', {{ mastered_count }}, 1, 5, 20, '#F59E0B'),
+                        this.createTieredBadge('Volcano', 'Summaries', '🌋', {{ docs_count }}, 10, 50, 100, '#EF4444'),
+                        this.createTieredBadge('Night Owl', 'Late Study', '🦉', {{ is_night_owl|yesno:"1,0" }}, 1, 1, 1, '#6366F1'),
+                    ];
                     this.$nextTick(() => {
                         if(window.lucide) { lucide.createIcons(); }
 
@@ -191,16 +269,17 @@
                         new Chart(hCtx, {
                             type: 'line',
                             data: {
-                                labels: ['3 Weeks Ago', '2 Weeks Ago', 'Last Week', 'This Week'],
+                                labels: ['6d ago', '5d ago', '4d ago', '3d ago', '2d ago', 'Yesterday', 'Today'],
                                 datasets: [{
                                     label: 'Hours',
                                     data: weeklyHours,
-                                    borderColor: '#8C1007',
+                                    borderColor: '#EF4444',
                                     borderWidth: 3,
                                     pointBackgroundColor: '#8C1007',
-                                    pointRadius: 6,
-                                    pointHoverRadius: 8,
-                                    fill: false,
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6,
+                                    fill: true,
+                                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
                                     tension: 0.4
                                 }]
                             },
@@ -218,6 +297,7 @@
 
                         // Bar Chart
                         const tCtx = document.getElementById('taskChart').getContext('2d');
+                        const hasStats = this.categoryStats && this.categoryStats.length > 0;
                         new Chart(tCtx, {
                             type: 'bar',
                             data: {
@@ -225,13 +305,13 @@
                                 datasets: [
                                     {
                                         label: 'Completed',
-                                        data: [this.categoryStats[0].completed],
+                                        data: [hasStats ? this.categoryStats[0].completed : 0],
                                         backgroundColor: '#8C1007',
                                         borderRadius: 8
                                     },
                                     {
                                         label: 'Total',
-                                        data: [this.categoryStats[0].total],
+                                        data: [hasStats ? this.categoryStats[0].total : 1],
                                         backgroundColor: '#e5e7eb',
                                         borderRadius: 8
                                     }

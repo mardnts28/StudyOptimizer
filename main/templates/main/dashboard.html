@@ -9,6 +9,21 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #FDE68A;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #F59E0B;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-white via-red-50/20 to-orange-50/20 min-h-screen">
     <nav class="sticky top-0 z-50 bg-white border-b border-gray-100">
@@ -195,28 +210,30 @@
                             <span class="text-lg">🏆</span>
                         </div>
                     </div>
-                    <div class="p-4 space-y-3">
-                        <template x-for="(achievement, i) in achievements" :key="i">
-                            <div :class="achievement.unlocked ? 'bg-white border-yellow-300 shadow-md' : 'bg-gray-50 border-gray-200'" class="p-3 rounded-xl border-2 transition-all">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <div :class="achievement.unlocked ? 'animate-bounce' : 'grayscale opacity-50'" class="text-2xl" x-text="achievement.emoji"></div>
-                                    <div class="flex-1">
-                                        <div class="font-bold text-sm text-gray-900" x-text="achievement.title"></div>
-                                        <template x-if="achievement.unlocked">
-                                            <div class="text-xs font-bold text-yellow-600">Unlocked! ✨</div>
-                                        </template>
-                                        <template x-if="!achievement.unlocked">
-                                            <div class="text-xs text-gray-600"><span x-text="Math.floor(achievement.progress)"></span>% complete</div>
-                                        </template>
-                                    </div>
-                                </div>
+                    <div class="p-4 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                <template x-for="(achievement, i) in achievements" :key="i">
+                    <div :class="achievement.unlocked ? 'bg-white shadow-md' : 'bg-gray-50 border-gray-100 opacity-60'" 
+                         :style="achievement.unlocked ? `border-color: ${achievement.color}` : ''"
+                         class="p-3 rounded-xl border-2 transition-all group">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div :class="achievement.unlocked ? 'animate-in zoom-in duration-500' : 'grayscale opacity-50'" class="text-2xl" x-text="achievement.emoji"></div>
+                            <div class="flex-1">
+                                <div class="font-bold text-[13px] text-gray-900" x-text="achievement.title"></div>
+                                <template x-if="achievement.unlocked">
+                                    <div class="text-[10px] font-black uppercase tracking-widest" :style="`color: ${achievement.color}`" x-text="achievement.tier === 3 ? 'Gold Mastery' : (achievement.tier === 2 ? 'Silver Mastery' : 'Bronze Mastery')"></div>
+                                </template>
                                 <template x-if="!achievement.unlocked">
-                                    <div class="bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                        <div class="bg-yellow-500 h-full rounded-full transition-all" :style="`width: ${achievement.progress}%`"></div>
-                                    </div>
+                                    <div class="text-[11px] text-gray-600"><span x-text="Math.floor(achievement.progress)"></span>% complete</div>
                                 </template>
                             </div>
+                        </div>
+                        <template x-if="achievement.tier < 3">
+                            <div class="bg-gray-200 rounded-full h-1 overflow-hidden">
+                                <div class="h-full rounded-full transition-all" :style="`width: ${achievement.progress}%; background-color: ${achievement.color}`"></div>
+                            </div>
                         </template>
+                    </div>
+                </template>
                     </div>
                 </div>
 
@@ -367,20 +384,67 @@
                     { label: 'Progress', value: '{{ completion_rate }}%', change: 'Keep it up!', icon: 'trending-up', emoji: '📈', color: '#8B5CF6', bgColor: '#EDE9FE' },
                 ],
                 upcomingTasks: JSON.parse('{{ upcoming_tasks_json|safe }}'),
-                achievements: [
-                    { title: 'Study Starter', emoji: '🌱', unlocked: {{ completed_count }} >= 1, progress: Math.min(({{ completed_count }} / 1) * 100, 100) },
-                    { title: 'Early Bird', emoji: '🐦', unlocked: {{ completed_count }} >= 10, progress: Math.min(({{ completed_count }} / 10) * 100, 100) },
-                    { title: 'Task Master', emoji: '🏆', unlocked: {{ completed_count }} >= 25, progress: Math.min(({{ completed_count }} / 25) * 100, 100) },
-                ],
+                achievements: [],
+                initCharts() {
+                    // Initialize achievements with tiers
+                    this.achievements = [
+                        this.createTieredBadge('Seedling', '🌱', 1, 1, 1, 1, '#10B981'),
+                        this.createTieredBadge('Deep Thinker', '🧠', {{ verified_count }}, 1, 10, 50, '#8B5CF6'),
+                        this.createTieredBadge('Knowledge Seeker', '🏹', {{ mastered_count }}, 1, 5, 20, '#F59E0B'),
+                        this.createTieredBadge('Night Owl', '🦉', {{ is_night_owl|yesno:"1,0" }}, 1, 1, 1, '#6366F1'),
+                        this.createTieredBadge('Volcano', '🌋', {{ docs_count }}, 10, 50, 100, '#EF4444'),
+                    ];
+
+                    this.$nextTick(() => {
+                        if(window.lucide) { lucide.createIcons(); }
+                        Chart.defaults.font.family = "'Inter', sans-serif";
+                        const ctx = document.getElementById('weeklyChart').getContext('2d');
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+                        gradient.addColorStop(0, '#8C1007');
+                        gradient.addColorStop(1, '#DC2626c8');
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                                datasets: [{
+                                    label: 'Study Hours',
+                                    data: JSON.parse('{{ weekly_hours_list|safe }}'),
+                                    backgroundColor: gradient,
+                                    borderRadius: 8
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: { grid: { display: false } },
+                                    y: { grid: { display: false }, beginAtZero: true }
+                                }
+                            }
+                        })
+                    })
+                },
+                createTieredBadge(title, emoji, current, b, s, g, defaultColor) {
+                    let tier = 0;
+                    let nextGoal = b;
+                    let color = '#cbd5e1';
+                    
+                    if (current >= g) { tier = 3; nextGoal = g; color = '#fbbf24'; }
+                    else if (current >= s) { tier = 2; nextGoal = g; color = '#94a3b8'; }
+                    else if (current >= b) { tier = 1; nextGoal = s; color = '#b45309'; }
+
+                    const unlocked = current >= b;
+                    return {
+                        title, emoji, unlocked, tier, color: unlocked ? color : '#cbd5e1',
+                        progress: Math.min((current / nextGoal) * 100, 100)
+                    };
+                },
                 async saveSchedule() {
                     if (this.newSchedule.day && this.newSchedule.time && this.newSchedule.activity) {
                         try {
                             const response = await fetch('/tasks/schedule/add/', {
                                 method: 'POST',
-                                headers: {
-                                    'X-CSRFToken': '{{ csrf_token }}',
-                                    'Content-Type': 'application/json'
-                                },
+                                headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
                                 body: JSON.stringify(this.newSchedule)
                             });
                             const data = await response.json();
@@ -390,9 +454,7 @@
                                 this.isScheduling = false;
                                 this.$nextTick(() => lucide.createIcons());
                             }
-                        } catch (error) {
-                            console.error('Error saving schedule:', error);
-                        }
+                        } catch (error) { console.error('Error saving schedule:', error); }
                     }
                 },
                 async deleteSchedule(id) {

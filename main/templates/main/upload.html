@@ -428,6 +428,41 @@
                                         </template>
                                     </div>
                                 </template>
+
+                                <!-- Score Display -->
+                                <template x-if="isQuizFinished()">
+                                    <div class="mt-8 p-6 bg-gradient-to-r from-amber-500 to-orange-500 rounded-[2rem] text-white shadow-lg animate-in slide-in-from-bottom duration-500">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl">🎯</div>
+                                                <div>
+                                                    <h4 class="font-bold text-xl">Quiz Complete!</h4>
+                                                    <p class="text-white/80 text-sm font-medium">You scored <span x-text="calculateScore()"></span>%</p>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-3xl font-black" x-text="calculateScore() >= 80 ? '🌟' : '📚'"></div>
+                                                <p class="text-[10px] font-bold uppercase tracking-widest mt-1" x-text="calculateScore() >= 80 ? 'Mastered!' : 'Keep Studying'"></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Error/Success Feedback -->
+                    <div class="px-8 mt-2">
+                        <template x-if="quizError">
+                            <div class="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-sm font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                                <span x-text="quizError"></span>
+                            </div>
+                        </template>
+                        <template x-if="quizSuccess">
+                            <div class="p-4 bg-green-50 border border-green-100 rounded-2xl text-green-700 text-sm font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                                <span x-text="quizSuccess"></span>
                             </div>
                         </template>
                     </div>
@@ -496,6 +531,8 @@
                 quizQuestions: [],
                 userAnswers: [],
                 numQuestions: 5,
+                quizError: '',
+                quizSuccess: '',
 
                 initSubtext() {
                     const messages = [
@@ -775,6 +812,9 @@
                     this.quizQuestions = [];
                     this.userAnswers = [];
 
+                    this.quizError = '';
+                    this.quizSuccess = '';
+
                     try {
                         const response = await fetch('/summarize/quiz/', {
                             method: 'POST',
@@ -793,12 +833,10 @@
                             this.quizQuestions = data.quiz;
                             this.userAnswers = new Array(data.quiz.length).fill(null);
                         } else {
-                            alert('Quiz generation failed: ' + data.message);
-                            this.quizModalOpen = false;
+                            this.quizError = data.message || 'Quiz generation failed.';
                         }
                     } catch (e) {
-                        alert('Error connecting to quiz service.');
-                        this.quizModalOpen = false;
+                        this.quizError = 'Error connecting to quiz service.';
                     } finally {
                         this.isGeneratingQuiz = false;
                         this.$nextTick(() => { if(window.lucide) lucide.createIcons() });
@@ -808,6 +846,8 @@
                 async saveQuiz() {
                     if (this.quizQuestions.length === 0 || this.isSavingQuiz) return;
                     this.isSavingQuiz = true;
+                    this.quizError = '';
+                    this.quizSuccess = '';
                     
                     try {
                         const response = await fetch('/summarize/quiz/save/', {
@@ -819,24 +859,27 @@
                             body: JSON.stringify({
                                 doc_id: this.currentDocId,
                                 questions: this.quizQuestions,
-                                title: `Quiz: ${this.title}`
+                                title: `Quiz: ${this.title}`,
+                                score: this.calculateScore()
                             })
                         });
 
                         const data = await response.json();
                         if (data.status === 'success') {
-                            alert('Quiz saved successfully!');
+                            this.quizSuccess = 'Quiz saved to your performance record! ✨';
                             this.savedQuizzes.unshift({
                                 id: data.quiz_id,
                                 title: `Quiz: ${this.title}`,
                                 questions: this.quizQuestions,
                                 date: 'Just Now'
                             });
+                            // Auto-close success message after 3s
+                            setTimeout(() => { this.quizSuccess = '' }, 3000);
                         } else {
-                            alert('Failed to save quiz: ' + data.message);
+                            this.quizError = data.message || 'Failed to save quiz.';
                         }
                     } catch (e) {
-                        alert('Error saving quiz.');
+                        this.quizError = 'Error saving quiz.';
                     } finally {
                         this.isSavingQuiz = false;
                     }
@@ -857,6 +900,21 @@
                 selectAnswer(qIdx, optIdx) {
                     if (this.userAnswers[qIdx] !== null) return;
                     this.userAnswers[qIdx] = optIdx;
+                },
+
+                isQuizFinished() {
+                    return this.userAnswers.length > 0 && this.userAnswers.every(a => a !== null);
+                },
+
+                calculateScore() {
+                    if (!this.isQuizFinished()) return 0;
+                    let correctCount = 0;
+                    this.quizQuestions.forEach((q, idx) => {
+                        if (this.userAnswers[idx] === this.getCorrectIdx(q.answer)) {
+                            correctCount++;
+                        }
+                    });
+                    return Math.round((correctCount / this.quizQuestions.length) * 100);
                 }
             }
         }

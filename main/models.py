@@ -71,6 +71,7 @@ class Task(models.Model):
     priority  = models.CharField(max_length=10, choices=PRIORITY_CHOICES)
     due_date  = models.DateField()
     completed = models.BooleanField(default=False)
+    reflection = models.TextField(blank=True, null=True, help_text="Mandatory learning proof for badges")
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -255,6 +256,8 @@ class Quiz(models.Model):
     document     = models.ForeignKey(SummarizedDocument, on_delete=models.CASCADE, related_name='quizzes')
     title        = models.CharField(max_length=255)
     questions    = models.JSONField(help_text="Stores quiz questions, options, and answers")
+    score        = models.IntegerField(default=0)
+    is_mastered  = models.BooleanField(default=False, help_text="Passed with 80% or higher")
     created_at   = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

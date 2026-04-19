@@ -113,7 +113,7 @@
                 <template x-for="task in tasks" :key="task.id">
                     <div class="p-5 border-2 rounded-xl flex items-center gap-4 transition-all hover:shadow-md"
                          :class="task.completed ? 'border-gray-200 bg-gray-50/50 opacity-70' : 'border-gray-100 bg-white hover:border-red-200'">
-                        <button @click="toggleTask(task.id)" class="flex-shrink-0 transition-transform hover:scale-110">
+                        <button @click="handleToggle(task)" class="flex-shrink-0 transition-transform hover:scale-110">
                             <i :data-lucide="task.completed ? 'check-circle-2' : 'circle'"
                                class="w-6 h-6"
                                :style="task.completed ? 'color: #10B981' : 'color: #D1D5DB'"></i>
@@ -261,6 +261,63 @@
             </div>
         </div>
 
+        <!-- ── Learning Reflection Modal ── -->
+        <div x-show="isReflectionOpen"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
+             style="display: none;">
+            <div @click.away="isReflectionOpen = false"
+                 class="bg-white rounded-2xl max-w-sm w-full shadow-2xl border-2 border-orange-100 overflow-hidden">
+                <div class="p-6 bg-orange-50/50 border-b border-orange-100 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white">
+                        <i data-lucide="lightbulb" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900">Learning Moment!</h3>
+                        <p class="text-xs text-orange-600 font-medium">Verify your progress to earn badges</p>
+                    </div>
+                </div>
+                <div class="p-6 space-y-4">
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        To mark this as <span class="font-bold text-gray-900">Completed with Learning</span>, please share one brief takeaway from this task:
+                    </p>
+                    <textarea x-model="currentReflection" 
+                              @input="reflectionError = ''"
+                              placeholder="e.g. Mastered the process of cellular respiration..."
+                              class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-orange-500 outline-none transition-colors text-sm min-h-[100px] bg-gray-50/50"
+                              :class="reflectionError ? 'border-red-400 focus:border-red-500' : 'border-gray-100 focus:border-orange-500'"></textarea>
+                    
+                    <template x-if="reflectionError">
+                        <div class="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-xs font-bold text-red-600 animate-in fade-in slide-in-from-top-1">
+                            <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+                            <span x-text="reflectionError"></span>
+                        </div>
+                    </template>
+                    
+                    <div class="flex gap-3">
+                        <button @click="isReflectionOpen = false; currentReflection = ''"
+                                class="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-all">
+                            Skip
+                        </button>
+                        <button @click="submitCompletion()"
+                                :disabled="!currentReflection.trim() || isToggling"
+                                :class="(!currentReflection.trim() || isToggling) ? 'bg-gray-200 cursor-not-allowed text-gray-400' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-100'"
+                                class="flex-1 py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2">
+                            <template x-if="isToggling">
+                                <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            </template>
+                            <span x-text="isToggling ? 'Verifying...' : 'Complete ✅'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- end Alpine wrapper -->
 
     <script>
@@ -268,10 +325,14 @@
             return {
                 isDialogOpen: false,
                 isDeleteOpen: false,
+                isReflectionOpen: false,
+                isToggling: false,
                 isAdding: false,
                 isEditMode: false,
                 currentTaskId: null,
                 taskToDelete: null,
+                currentReflection: '',
+                reflectionError: '',
                 newTask: { title: '', subject: 'General', period: 'General', priority: '', dueDate: '' },
                 tasks: JSON.parse('{{ tasks_data|safe }}'),
 
@@ -290,18 +351,67 @@
                     return Math.round((this.completedTasks().length / this.tasks.length) * 100);
                 },
 
-                async toggleTask(id) {
+                handleToggle(task) {
+                    if (task.completed) {
+                        this.toggleTask(task.id);
+                    } else {
+                        this.currentTaskId = task.id;
+                        this.reflectionError = '';
+                        this.currentReflection = '';
+                        this.isReflectionOpen = true;
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                },
+
+                async submitCompletion() {
+                    const reflection = this.currentReflection.trim();
+                    if (!reflection) {
+                        this.reflectionError = 'Please share a takeaway.';
+                        return;
+                    }
+                    if (reflection.length < 15) {
+                        this.reflectionError = 'Reflection is too short (min 15 chars).';
+                        return;
+                    }
+                    
+                    this.isToggling = true;
+                    this.reflectionError = '';
+                    
+                    const success = await this.toggleTask(this.currentTaskId, reflection);
+                    this.isToggling = false;
+
+                    if (success) {
+                        this.isReflectionOpen = false;
+                        this.currentReflection = '';
+                        this.currentTaskId = null;
+                    }
+                },
+
+                async toggleTask(id, reflection = null) {
                     try {
                         const res  = await fetch(`/tasks/toggle/${id}/`, {
                             method: 'POST',
-                            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' }
+                            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reflection: reflection })
                         });
                         const data = await res.json();
                         if (data.status === 'success') {
                             this.tasks = this.tasks.map(t => t.id === id ? { ...t, completed: data.completed } : t);
                             this.$nextTick(() => lucide.createIcons());
+                            return true;
+                        } else if (data.status === 'error') {
+                            if (this.isReflectionOpen) {
+                                this.reflectionError = data.message;
+                            } else {
+                                alert(data.message);
+                            }
+                            return false;
                         }
-                    } catch (e) { console.error('Toggle error:', e); }
+                    } catch (e) { 
+                        console.error('Toggle error:', e);
+                        this.reflectionError = 'Connection failed. Please try again.';
+                        return false;
+                    }
                 },
 
                 // Opens the custom modal instead of browser confirm
